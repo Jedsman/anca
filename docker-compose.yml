@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Ollama service (local LLM)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: anca-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Model puller service (runs once)
+  model-puller:
+    image: curlimages/curl
+    container_name: anca-model-puller
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ./pull_models.sh:/pull_models.sh
+    entrypoint: [ "/bin/sh", "/pull_models.sh" ]
+    restart: "no"
+
+  # ANCA API service
+  anca:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: anca-api
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - CREWAI_TELEMETRY=false
+      - CREWAI_TRACING_ENABLED=false
+      - LOG_LEVEL=INFO
+      - LOG_MAX_BYTES=10485760  # 10MB
+      - LOG_BACKUP_COUNT=5
+      - CACHE_TTL_DAYS=7
+    volumes:
+      - ./articles:/app/articles
+      - ./cache:/app/.cache
+      - ./chroma:/app/.chroma
+      - ./logs:/app/logs
+    depends_on:
+      ollama:
+        condition: service_healthy
+      model-puller:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+    driver: local

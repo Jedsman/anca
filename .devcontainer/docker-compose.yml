@@ -1,0 +1,35 @@
+services:
+  anca-dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+
+    volumes:
+      # Mount the entire workspace
+      - ..:/workspace:cached
+
+      # Persist bash history
+      - devcontainer-bashhistory:/commandhistory
+
+      # Persist Python packages (optional, for faster rebuilds)
+      - devcontainer-python-packages:/usr/local/lib/python3.13/site-packages
+
+    # Load environment variables
+    env_file:
+      - ../.env
+
+    # Keep container running
+    command: sleep infinity
+
+    # Enable ptrace for debugging
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+
+    # Network mode
+    network_mode: bridge
+
+volumes:
+  devcontainer-bashhistory:
+  devcontainer-python-packages:

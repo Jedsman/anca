@@ -1,0 +1,38 @@
+# ANCA API Dockerfile (Updated for app structure)
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Copy project files
+COPY pyproject.toml uv.lock ./
+COPY agents/ ./agents/
+COPY tools/ ./tools/
+COPY app/ ./app/
+COPY run_crew.py ./
+
+# Install dependencies
+RUN uv sync --frozen
+
+# Install Playwright browsers
+RUN uv run playwright install --with-deps chromium
+
+# Create directories
+RUN mkdir -p articles .cache .chroma
+
+# Expose API port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run API server
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

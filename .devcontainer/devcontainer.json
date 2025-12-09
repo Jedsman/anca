@@ -1,0 +1,58 @@
+{
+    "name": "ANCA Development",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "anca-dev",
+    "workspaceFolder": "/workspace",
+    // Configure tool-specific properties
+    "customizations": {
+        "vscode": {
+            // Extensions to install in the container
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-python.debugpy",
+                "charliermarsh.ruff",
+                "tamasfe.even-better-toml",
+                "redhat.vscode-yaml",
+                "streetsidesoftware.code-spell-checker"
+            ],
+            // VS Code settings
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": false,
+                "python.formatting.provider": "none",
+                "python.analysis.typeCheckingMode": "basic",
+                "python.analysis.autoImportCompletions": true,
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": "explicit"
+                },
+                "[python]": {
+                    "editor.defaultFormatter": "charliermarsh.ruff",
+                    "editor.tabSize": 4
+                },
+                "files.exclude": {
+                    "**/__pycache__": true,
+                    "**/*.pyc": true
+                }
+            }
+        }
+    },
+    // Features to add to the dev container
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    // Use 'forwardPorts' to make a list of ports inside the container available locally
+    "forwardPorts": [
+        8000
+    ],
+    // Use 'postCreateCommand' to run commands after the container is created
+    "postCreateCommand": "pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir ruff pytest ipython",
+    // Comment out to connect as root instead
+    "remoteUser": "root",
+    // Keep container running for interactive development
+    "overrideCommand": true,
+    "shutdownAction": "stopContainer"
+}
