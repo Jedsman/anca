@@ -5,16 +5,19 @@ Multi-agent system for autonomous content creation.
 ## Agents
 
 ### [Market Researcher](researcher.md)
-- **Model**: llama3.2:3b
+
+- **Model**: llama3.1:8b
 - **Role**: Keyword research and topic discovery
 - **Stage**: 2
 
 ### [Content Generator](generator.md)
+
 - **Model**: qwen2.5:3b
 - **Role**: Article writing with RAG
 - **Stage**: 2 (enhanced in Stage 3)
 
 ### [SEO Auditor](auditor.md)
+
 - **Model**: mistral:7b
 - **Role**: Quality evaluation and feedback
 - **Stage**: 3

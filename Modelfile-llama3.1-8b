@@ -1,0 +1,11 @@
+FROM llama3.1:8b
+
+# Lower context window to 8k to fit in 8GB VRAM (GTX 1070)
+PARAMETER num_ctx 8192
+
+# Force full GPU offload
+PARAMETER num_gpu 999
+
+# SYSTEM "You are a helpful AI assistant."
+
+# ollama create llama3.1:8b -f Modelfile-llama3.1-8b

@@ -1,25 +1,41 @@
 import os
+import sys
 
-import google.generativeai as genai
-from dotenv import load_dotenv
+try:
+    import google.generativeai as genai
+    from dotenv import load_dotenv
+except ImportError as e:
+    print(f"Missing dependency: {e}")
+    print("Please ensure google-generativeai and python-dotenv are installed.")
+    sys.exit(1)
 
-load_dotenv()
+def list_models():
+    load_dotenv()
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    
+    if not api_key:
+        print("Error: GEMINI_API_KEY or GOOGLE_API_KEY not set in environment.")
+        return
 
-api_key = os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    print("Error: GEMINI_API_KEY not found in environment variables.")
-    print("Please set it in your .env file or directly in your environment.")
-else:
-    genai.configure(api_key=api_key)
-    print("Attempting to list available Gemini models...")
+    print(f"Using API Key: {api_key[:8]}...****")
+    
     try:
-        import pprint
-        for model in genai.list_models():
-            pprint.pprint(model)
-    except Exception as e:
-        print(f"An error occurred while listing models: {e}")
-        print("Please ensure your GEMINI_API_KEY is valid and has access to the Gemini API.")
+        genai.configure(api_key=api_key)
+        print("\nFetching available models compatible with generateContent...")
+        found = False
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                print(f"- {m.name} (Display Name: {m.display_name})")
+                found = True
+        
+        if not found:
+            print("No models found that support generateContent.")
 
-print("\n--- Diagnostic complete ---")
-print("If you still encounter issues, please double-check your API key and its permissions.")
+    except Exception as e:
+        print(f"\nError occurred: {e}")
+        import traceback
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    print("Checking Gemini Models...")
+    list_models()

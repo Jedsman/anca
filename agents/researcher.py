@@ -1,47 +1,81 @@
 """
-Market Researcher Agent
-Identifies low-competition, high-intent long-tail keywords for content creation.
+Market Researcher Node (LangGraph)
+Uses native tool calling to find and verify sources.
 """
-from crewai import Agent, LLM
-from typing import List
-from crewai.tools import BaseTool
+import os
+import logging
+from typing import List, Annotated
+from langchain_ollama import ChatOllama
+from langchain_core.messages import SystemMessage, HumanMessage
+from langgraph.prebuilt import create_react_agent
+from langchain_core.tools import tool
 
+from app.core.langchain_logging_callback import LangChainLoggingHandler
+from tools.search_tool import web_search
+from tools.scraper_tool import ScraperTool
 
-def create_researcher(tools: List[BaseTool], base_url: str = "http://localhost:11434") -> Agent:
-    """
-    Create the Market Researcher agent with optimized small model.
-    Uses llama3.2:3b for fast keyword research.
+from tools.rag_tool import RAGTool
 
-    Args:
-        tools: List of tools available to the agent
-        base_url: Ollama base URL
+logger = logging.getLogger(__name__)
 
-    Returns:
-        Configured Market Researcher agent
-    """
-    import logging
-    logger = logging.getLogger(__name__)
+# --- Tool Wrappers ---
+scraper = ScraperTool()
+rag = RAGTool()
 
-    model_name = "ollama/llama3.2:3b"
-    logger.info(f"Creating Researcher agent with model: {model_name} at {base_url}")
+@tool
+def scrape_website(url: str):
+    """Scrape content from a website URL. Use this to verify if a URL is good."""
+    return scraper._run(url)
 
-    llm = LLM(
-        model=model_name,
-        base_url=base_url,
-        temperature=0.5  # Lower temp for more focused research
+@tool
+def ingest_content(url: str):
+    """Ingest a URL into the RAG knowledge base. Use this for EVERY good URL you find."""
+    return rag._run(action="ingest", url=url)
+
+# --- System Prompt for Tool-First Execution ---
+RESEARCHER_SYSTEM_PROMPT = """You are an autonomous research agent. You MUST follow these rules STRICTLY:
+
+## EXECUTION RULES (MANDATORY)
+1. **TOOL-FIRST**: Your FIRST response MUST be a tool call. NEVER start with text.
+2. **NO CONVERSATION**: Do NOT ask questions, seek clarification, or say "I will now...".
+3. **NO PLANNING TEXT**: Do NOT output plans or explanations. Just execute tools.
+4. **SILENT EXECUTION**: Execute tools silently. Only output results at the end.
+
+## FORBIDDEN BEHAVIORS (WILL CAUSE FAILURE)
+- ❌ "Would you like me to..."
+- ❌ "I will now search for..."
+- ❌ "Let me help you..."
+- ❌ "Before I begin..."
+- ❌ Any question marks in your response
+- ❌ Any text before your first tool call
+
+## CORRECT BEHAVIOR
+Your response should IMMEDIATELY start with a tool call. Example:
+[tool_call: web_search(query="...")]
+
+BEGIN EXECUTION NOW. NO TEXT. ONLY TOOL CALLS."""
+
+# --- Node Factory ---
+def create_researcher_node():
+    """Create the Researcher agent as a LangGraph node."""
+
+    # 1. Setup LLM
+    llm = ChatOllama(
+        model="qwen2.5:7b-instruct",
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+        temperature=0.3,  # Lower temperature for more deterministic tool use
+        num_ctx=10240,
+        callbacks=[LangChainLoggingHandler(agent_name="Market Researcher")]
     )
 
-    return Agent(
-        role='Market Researcher',
-        goal='Find 3-5 high-quality, diverse sources from different domains for a given topic, along with a promising long-tail keyword for SEO.',
-        backstory=(
-            "You are an expert SEO analyst and content researcher. "
-            "You excel at identifying untapped niches and finding diverse, "
-            "authoritative sources from different domains. You understand that "
-            "quality content requires multiple perspectives and credible sources."
-        ),
-        verbose=True,
-        allow_delegation=False,
-        llm=llm,
-        tools=tools
+    # 2. Define Tools
+    tools = [web_search, scrape_website, ingest_content]
+
+    # 3. Create Agent with system prompt for tool-first behavior
+    agent = create_react_agent(
+        llm,
+        tools,
+        prompt=RESEARCHER_SYSTEM_PROMPT
     )
+
+    return agent

@@ -32,7 +32,7 @@ class AnsiStrippingFormatter(logging.Formatter):
             record.msg = self.ANSI_RE.sub('', record.msg)
         return super().format(record)
 
-def get_session_log_file(base_name: str, logs_dir: "pathlib.Path", max_files: int = 10) -> "pathlib.Path":
+def get_session_log_file(base_name: str, logs_dir: "pathlib.Path", max_files: int = 10, extension: str = ".log") -> "pathlib.Path":
     """
     Generate a timestamped log filename for the current session and clean up old logs.
     
@@ -40,6 +40,7 @@ def get_session_log_file(base_name: str, logs_dir: "pathlib.Path", max_files: in
         base_name: Base name for the log file (e.g., 'anca')
         logs_dir: Directory where logs are stored
         max_files: Maximum number of recent log files to keep for this base_name
+        extension: File extension (default: .log)
         
     Returns:
         Path to the new log file
@@ -54,12 +55,12 @@ def get_session_log_file(base_name: str, logs_dir: "pathlib.Path", max_files: in
 
     # Generate new filename
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_file = logs_dir / f"{base_name}_{timestamp}.log"
+    log_file = logs_dir / f"{base_name}_{timestamp}{extension}"
     
     # Cleanup old logs
     try:
         # Find all files matching the pattern
-        pattern = str(logs_dir / f"{base_name}_*.log")
+        pattern = str(logs_dir / f"{base_name}_*{extension}")
         files = glob.glob(pattern)
         
         # Sort by modification time (newest last)

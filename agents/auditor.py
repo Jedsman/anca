@@ -1,47 +1,72 @@
 """
-SEO Auditor Agent
-Evaluates content quality and provides feedback for revisions
+SEO Auditor Node (LangGraph)
+Critiques content and provides feedback.
 """
-from crewai import Agent, LLM
+import os
+import logging
 from typing import List
-from crewai.tools import BaseTool
+from langchain_ollama import ChatOllama
+from langgraph.prebuilt import create_react_agent
+from langchain_core.tools import tool
 
+from app.core.langchain_logging_callback import LangChainLoggingHandler
+from tools.file_reader_tool import FileReaderTool
 
-def create_auditor(tools: List[BaseTool], base_url: str = "http://localhost:11434") -> Agent:
-    """
-    Create the SEO Auditor agent with critique model.
-    Uses mistral:7b for better analysis and feedback.
+logger = logging.getLogger(__name__)
 
-    Args:
-        tools: List of tools available to the agent
-        base_url: Ollama base URL
+# --- Tool Wrappers ---
+file_reader = FileReaderTool()
 
-    Returns:
-        Configured SEO Auditor agent
-    """
-    import logging
-    logger = logging.getLogger(__name__)
+@tool
+def read_article_file(filename: str):
+    """Read the content of the drafted article file to audit it."""
+    return file_reader._run(filename=filename)
 
-    model_name = "ollama/mistral:7b"
-    logger.info(f"Creating Auditor agent with model: {model_name} at {base_url}")
+# --- System Prompt for Tool-First Execution ---
+AUDITOR_SYSTEM_PROMPT = """You are an autonomous SEO auditor agent. You MUST follow these rules STRICTLY:
 
-    llm = LLM(
-        model=model_name,
-        base_url=base_url,
-        temperature=0.3  # Lower temp for consistent critique
+## EXECUTION RULES (MANDATORY)
+1. **TOOL-FIRST**: Your FIRST response MUST be a tool call to `read_article_file`. NEVER start with text.
+2. **NO CONVERSATION**: Do NOT ask questions or say "I will now...".
+3. **CRITICAL ANALYSIS**: Be harsh and specific in your critique. No empty praise.
+4. **SCORE REQUIRED**: You MUST provide a "Quality Score: X/10" in your final output.
+
+## FORBIDDEN BEHAVIORS (WILL CAUSE FAILURE)
+- ❌ "Would you like me to..."
+- ❌ "I will now..."
+- ❌ Any question marks in your response
+- ❌ Any text before your first tool call
+- ❌ Ending without a Quality Score
+
+## CORRECT EXECUTION SEQUENCE
+1. Call `read_article_file(filename="...")` to read the article
+2. Analyze against SEO and quality criteria
+3. Output a structured critique with "Quality Score: X/10"
+
+BEGIN EXECUTION NOW. NO TEXT. ONLY TOOL CALLS."""
+
+# --- Node Factory ---
+def create_auditor_node():
+    """Create the Auditor agent as a LangGraph node."""
+
+    # 1. Setup LLM
+    llm = ChatOllama(
+        model="qwen2.5:7b-instruct",
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+        temperature=0.3,  # Low temp for critical analysis
+        num_ctx=10240,
+        callbacks=[LangChainLoggingHandler(agent_name="SEO Auditor")]
     )
 
-    return Agent(
-        role='SEO Auditor',
-        goal='Evaluate blog posts for SEO quality, E-E-A-T compliance, and provide actionable feedback for improvement.',
-        backstory=(
-            "You are an expert SEO consultant and content quality analyst. "
-            "You have years of experience evaluating content for Google's E-E-A-T guidelines "
-            "(Experience, Expertise, Authoritativeness, Trustworthiness). "
-            "You provide clear, actionable feedback to improve content quality and search rankings."
-        ),
-        verbose=True,
-        allow_delegation=False,
-        llm=llm,
-        tools=tools
+    # 2. Define Tools
+    # Auditor NEEDS to read the file to critique it properly
+    tools = [read_article_file]
+
+    # 3. Create Agent with system prompt for tool-first behavior
+    agent = create_react_agent(
+        llm,
+        tools,
+        prompt=AUDITOR_SYSTEM_PROMPT
     )
+
+    return agent

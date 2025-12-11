@@ -34,13 +34,44 @@ class FileReaderTool(BaseTool):
             clean_filename = Path(filename).name
             file_path = articles_dir / clean_filename
             
-            if not file_path.exists():
-                # Try adding .md extension if it's missing and file wasn't found
+            # Strategy 1: Try exact match
+            if file_path.exists():
+                logger.info(f"Found file (exact match): {file_path}")
+            else:
+                # Strategy 2: Try with .md extension if missing
                 if not clean_filename.lower().endswith('.md'):
                     alt_path = articles_dir / f"{clean_filename}.md"
                     if alt_path.exists():
                         file_path = alt_path
-                        logger.info(f"files found with added .md extension: {file_path}")
+                        logger.info(f"Found file with added .md extension: {file_path}")
+                
+                # Strategy 3: Try different slug variations (handle hyphen inconsistencies)
+                if not file_path.exists():
+                    base_name = clean_filename.replace('.md', '').replace('.MD', '')
+                    variations = [
+                        base_name.replace('-', ''),  # homebrew-coffee → homebrewcoffee
+                        base_name.replace(' ', '-'),  # homebrew coffee → homebrew-coffee
+                        base_name.replace(' ', ''),   # homebrew coffee → homebrewcoffee
+                    ]
+                    
+                    for variation in variations:
+                        test_path = articles_dir / f"{variation}.md"
+                        if test_path.exists():
+                            file_path = test_path
+                            logger.info(f"Found file with slug variation: {file_path} (from {filename})")
+                            break
+                
+                # Strategy 4: Fuzzy search - find any file containing the base topic
+                if not file_path.exists():
+                    topic_words = base_name.lower().replace('-', ' ').split()
+                    if topic_words:
+                        for article_file in articles_dir.glob('*.md'):
+                            article_name = article_file.stem.lower()
+                            # Check if all topic words appear in the filename
+                            if all(word in article_name for word in topic_words):
+                                file_path = article_file
+                                logger.info(f"Found file via fuzzy match: {file_path} (from {filename})")
+                                break
             
             if not file_path.exists():
                 return f"❌ File not found: {filename} (checked {file_path})"

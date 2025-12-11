@@ -28,3 +28,6 @@ logs/
 chromadb/
 .claude/
 .vscode/
+articles/.versions/
+logs/tool_calls/*.jsonl
+logs/llm_calls/*.jsonl

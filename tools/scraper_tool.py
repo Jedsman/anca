@@ -1,11 +1,12 @@
 from crewai.tools import BaseTool
-from typing import Any, List, Dict, Optional
+from typing import Any, List, Dict, Optional, Type
 from langchain_community.document_loaders import AsyncChromiumLoader
 from langchain_community.document_transformers import BeautifulSoupTransformer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from robotexclusionrulesparser import RobotExclusionRulesParser
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from pydantic import BaseModel, Field, field_validator
 import time
 import random
 from urllib.parse import urlparse
@@ -24,9 +25,39 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+class ScraperToolSchema(BaseModel):
+    """Input schema for ScraperTool."""
+    url: str = Field(..., description="The URL to scrape.")
+    keywords: Optional[List[str]] = Field(
+        default=None, 
+        description="Optional list of keywords to filter chunks. Only chunks containing at least one keyword are kept."
+    )
+    
+    @field_validator('keywords', mode='before')
+    @classmethod
+    def sanitize_keywords(cls, v):
+        """Handle string 'None' or other invalid values for keywords."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            if v.lower() in ('none', 'null', ''):
+                return None
+            # Single keyword as string - convert to list
+            return [v]
+        if isinstance(v, list):
+            # Filter out None and 'None' strings from list
+            cleaned = [k for k in v if k and str(k).lower() not in ('none', 'null', '')]
+            return cleaned if cleaned else None
+        return v
+
+
 class ScraperTool(BaseTool):
     name: str = "ScraperTool"
-    description: str = "Scrapes a website and returns its content as LLM-ready chunks with metadata."
+    description: str = (
+        "Scrapes a website URL and returns its content as text chunks. "
+        "Provide the URL to scrape. Optionally provide keywords to filter relevant content."
+    )
+    args_schema: Type[BaseModel] = ScraperToolSchema
 
     # Configuration
     user_agent: str = "ANCA-Bot/1.0 (Educational Research; +https://github.com/yourproject/anca)"
@@ -165,12 +196,24 @@ class ScraperTool(BaseTool):
         wait=wait_exponential(multiplier=1, min=4, max=10),
         retry=retry_if_exception_type((requests.exceptions.RequestException, TimeoutError))
     )
-    def _load_and_transform(self, url: str) -> List[Dict[str, Any]]:
+    def _load_and_transform(self, url: str, keywords: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """Load and transform web content into LLM-ready chunks with metadata."""
         
-        # Check cache first
+        # Check cache first (Not using keywords in cache key yet, simple URL cache)
+        # Improvement: If we use keywords, we should maybe re-filter cached content?
+        # For now, let's load cached content and apply filter if needed.
         cached_content = self._get_cached_content(url)
         if cached_content:
+            logger.info(f"Loaded {len(cached_content)} chunks from cache for {url}")
+            # Apply keyword filter to cached content if provided
+            if keywords:
+                filtered = []
+                for chunk in cached_content:
+                    text_lower = chunk['content'].lower()
+                    if any(k.lower() in text_lower for k in keywords):
+                        filtered.append(chunk)
+                logger.info(f"Filtered cached content: {len(filtered)}/{len(cached_content)} chunks matched keywords {keywords}")
+                return filtered
             return cached_content
         
         # Check robots.txt
@@ -199,20 +242,46 @@ class ScraperTool(BaseTool):
             # Step 2: Transform and clean the HTML content
             logger.info(f"Transforming HTML content from {url}")
             bs_transformer = BeautifulSoupTransformer()
-            
+
             # Extract main content tags and remove noise
+            # NOTE: Including "div" is CRITICAL - most modern websites use div containers for content
             docs_transformed = bs_transformer.transform_documents(
                 docs,
                 tags_to_extract=[
-                    "article", "main", "section",  # Semantic content containers
-                    "h1", "h2", "h3", "h4", "h5", "h6",  # Headings
-                    "p", "li", "blockquote",  # Text content
-                    "pre", "code",  # Code blocks
-                    "table", "th", "td",  # Tables
-                    "a"  # Links (for context)
+                    # Semantic containers
+                    "article", "main", "section", "div",  # div is critical for modern sites
+                    # Headings
+                    "h1", "h2", "h3", "h4", "h5", "h6",
+                    # Content
+                    "p", "li", "ul", "ol", "blockquote",
+                    "span", "strong", "em", "b", "i",  # Inline text elements
+                    # Data
+                    "table", "th", "td", "tr", "tbody", "thead",
+                    # Links
+                    "a"
                 ],
-                tags_to_remove=["script", "style", "nav", "footer", "aside", "iframe"]
+                tags_to_remove=[
+                    # Scripts & styles
+                    "script", "style", "noscript",
+                    # Navigation
+                    "nav", "header", "footer", "aside",
+                    # Forms & interactive
+                    "form", "button", "input", "select", "textarea",
+                    # Media & visual
+                    "iframe", "svg", "canvas", "figure", "figcaption", "img", "video", "audio",
+                    # Ads & tracking
+                    "ins", "ad"
+                ]
             )
+
+            # Log extracted content length for debugging
+            if docs_transformed:
+                extracted_text = docs_transformed[0].page_content if docs_transformed else ""
+                logger.info(f"Extracted {len(extracted_text)} characters from {url}")
+                if len(extracted_text) == 0:
+                    logger.warning(f"⚠️ Zero content extracted from {url} - possible parsing issue")
+            else:
+                logger.warning(f"⚠️ No documents after transformation for {url}")
 
             # Extract metadata from the first document
             metadata = {
@@ -228,7 +297,25 @@ class ScraperTool(BaseTool):
                 chunk_overlap=self.chunk_overlap,
             )
             splits = splitter.split_documents(docs_transformed)
-            
+            logger.info(f"Created {len(splits)} splits from extracted content")
+
+            # Fallback: If tag-based extraction produced nothing, try more permissive extraction
+            if not splits or len(splits) == 0:
+                logger.warning(f"Tag-based extraction failed for {url}, trying fallback method")
+
+                # Fallback: Extract all text, only remove noise tags
+                docs_fallback = bs_transformer.transform_documents(
+                    docs,
+                    tags_to_extract=None,  # Extract everything
+                    tags_to_remove=["script", "style", "noscript", "nav", "header", "footer",
+                                    "aside", "form", "button", "input", "select", "textarea",
+                                    "iframe", "svg", "canvas", "img", "video", "audio"]
+                )
+
+                if docs_fallback:
+                    splits = splitter.split_documents(docs_fallback)
+                    logger.info(f"Fallback extraction created {len(splits)} splits")
+
             # Create chunks with metadata
             chunks = []
             for i, split in enumerate(splits):
@@ -244,8 +331,18 @@ class ScraperTool(BaseTool):
             
             logger.info(f"Successfully scraped {url}: {len(chunks)} chunks created")
             
-            # Save to cache
+            # Save raw chunks to cache (before filtering, so we have full content)
             self._save_to_cache(url, chunks)
+            
+            # Apply keyword filter if provided
+            if keywords:
+                filtered_chunks = []
+                for chunk in chunks:
+                    text_lower = chunk['content'].lower()
+                    if any(k.lower() in text_lower for k in keywords):
+                        filtered_chunks.append(chunk)
+                logger.info(f"Filtered content: {len(filtered_chunks)}/{len(chunks)} chunks matched keywords {keywords}")
+                return filtered_chunks
             
             return chunks
 
@@ -253,21 +350,38 @@ class ScraperTool(BaseTool):
             logger.error(f"Error during scraping {url}: {type(e).__name__}: {e}")
             raise
 
-    def _run(self, url: str) -> str:
+    def _run(self, url: str, keywords: Optional[List[str]] = None) -> str:
         """
         Main entry point for the scraper tool.
         
         Args:
             url: The URL to scrape
+            keywords: Optional list of keywords. Only chunks containing at least one keyword are kept.
             
         Returns:
             A formatted string containing the scraped content with metadata
         """
         try:
-            logger.info(f"Starting scrape for {url}")
-            chunks = self._load_and_transform(url)
+            # Sanitize keywords: handle string "None" or empty values
+            if keywords is not None:
+                if isinstance(keywords, str):
+                    if keywords.lower() in ('none', 'null', ''):
+                        keywords = None
+                    else:
+                        # Single keyword passed as string, convert to list
+                        keywords = [keywords]
+                elif isinstance(keywords, list):
+                    # Filter out None, 'None', and empty strings from list
+                    keywords = [k for k in keywords if k and str(k).lower() not in ('none', 'null', '')]
+                    if not keywords:
+                        keywords = None
+            
+            logger.info(f"Starting scrape for {url} (keywords={keywords})")
+            chunks = self._load_and_transform(url, keywords)
             
             if not chunks:
+                if keywords:
+                    return f"Failed to scrape relevant content from {url}. Content found but no chunks matched keywords: {keywords}"
                 return f"Failed to scrape content from {url}"
             
             # Format the output for better agent consumption
@@ -276,7 +390,7 @@ class ScraperTool(BaseTool):
                 f"# Scraped Content from: {url}",
                 f"Title: {metadata.get('source_title', 'Unknown')}",
                 f"Scraped at: {metadata.get('scraped_at', 'Unknown')}",
-                f"Total chunks: {len(chunks)}",
+                f"Total relevant chunks: {len(chunks)}",
                 "",
                 "---",
                 ""

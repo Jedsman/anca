@@ -79,8 +79,8 @@ cat articles/homebrew-coffee.md
 
 **Logs should show:**
 ```
-Creating Researcher agent with model: ollama/llama3.2:3b at http://ollama:11434
-Creating Generator agent with model: ollama/qwen2.5:3b at http://ollama:11434
+Creating Researcher agent with model: ollama/llama3.1:8b at http://ollama:11434
+Creating Generator agent with model: ollama/llama3.1:8b at http://ollama:11434
 Creating Auditor agent with model: ollama/mistral:7b at http://ollama:11434
 Starting scrape for https://duckduckgo.com/?q=homebrew+coffee
 Successfully scraped URL: 1 chunks created
@@ -135,8 +135,8 @@ docker-compose logs -f ollama
 docker-compose up model-puller
 
 # Or pull manually
-docker exec anca-ollama ollama pull llama3.2:3b
-docker exec anca-ollama ollama pull qwen2.5:3b
+docker exec anca-ollama ollama pull llama3.1:8b
+docker exec anca-ollama ollama pull llama3.1:8b
 docker exec anca-ollama ollama pull mistral:7b
 
 # Verify models
@@ -160,7 +160,7 @@ docker-compose logs anca | grep -i validation
 
 ```bash
 # Check if models are responding
-docker exec anca-ollama ollama run llama3.2:3b "test"
+docker exec anca-ollama ollama run llama3.1:8b "test"
 
 # Check resource usage
 docker stats anca-api anca-ollama
@@ -276,13 +276,13 @@ curl http://localhost:8000/api/v1/articles/{filename}
 docker exec anca-ollama ollama list
 
 # Pull a model
-docker exec anca-ollama ollama pull llama3.2:3b
+docker exec anca-ollama ollama pull llama3.1:8b
 
 # Remove a model
-docker exec anca-ollama ollama rm llama3.2:3b
+docker exec anca-ollama ollama rm llama3.1:8b
 
 # Test a model
-docker exec anca-ollama ollama run llama3.2:3b "Hello"
+docker exec anca-ollama ollama run llama3.1:8b "Hello"
 
 # Check Ollama API
 curl http://localhost:11434/api/tags
@@ -319,7 +319,7 @@ grep -i "validation" logs/anca.log
 2. All models are available:
    ```bash
    docker exec anca-ollama ollama list
-   # Should show: llama3.2:3b, qwen2.5:3b, mistral:7b
+   # Should show: llama3.1:8b, llama3.1:8b, mistral:7b
    ```
 
 3. Logs show agent creation:

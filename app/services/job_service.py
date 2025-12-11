@@ -27,14 +27,48 @@ class JobService:
         self.jobs: Dict[str, dict] = {}
 
     def _extract_filename_from_result(self, result_str: str) -> Optional[str]:
-        """Extract the filename from the crew result output"""
-        # Look for patterns like "Article written to: filename.md"
-        match = re.search(r'Article written to:\s*([^\s\n]+\.md)', result_str)
-        if match:
-            return match.group(1)
+        """Extract the filename from the crew result output.
+
+        Tries multiple extraction methods in order:
+        1. JSON parsing (if agent outputs structured JSON)
+        2. Regex patterns (for natural language outputs)
+        """
+        import json
+
+        # Method 1: Try JSON parsing first (most reliable)
+        try:
+            # Look for JSON-like structure in the result
+            result_clean = result_str.strip()
+            if result_clean.startswith('{') and result_clean.endswith('}'):
+                result_json = json.loads(result_clean)
+                if 'filename' in result_json:
+                    return result_json['filename']
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Method 2: Regex patterns (fallback for natural language)
+        patterns = [
+            r'Article written to:\s*([^\s\n]+\.md)',
+            r'Revision complete:\s*([^\s\n]+\.md)',
+            r'saved to:\s*([^\s\n]+\.md)',
+            r'wrote to:\s*([^\s\n]+\.md)',
+            r'filename["\']?:\s*["\']?([^\s\n"\']+\.md)',
+            r'"filename":\s*"([^"]+\.md)"',  # JSON field in text
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, result_str, re.IGNORECASE)
+            if match:
+                return match.group(1)
+
         return None
 
-    def _validate_job_completion(self, job_id: str, result_str: str) -> tuple[bool, Optional[str]]:
+    def _construct_filename_from_topic(self, topic: str) -> str:
+        """Construct expected filename from topic"""
+        # Convert topic to slug: lowercase, replace spaces/special chars with hyphens
+        slug = re.sub(r'[^a-z0-9]+', '-', topic.lower()).strip('-')
+        return f"{slug}.md"
+
+    def _validate_job_completion(self, job_id: str, result_str: str, topic: str = None) -> tuple[bool, Optional[str]]:
         """
         Validate that a job actually completed successfully.
         Returns (is_valid, error_message)
@@ -45,25 +79,42 @@ class JobService:
 
         # Check 2: Look for article filename in result
         filename = self._extract_filename_from_result(result_str)
-        if not filename:
-            logger.warning(f"Job {job_id}: Could not extract filename from result")
-            # Don't fail if we can't extract, but log it
+        
+        # Fallback: construct filename from topic if not found in result
+        if not filename and topic:
+            filename = self._construct_filename_from_topic(topic)
+            logger.warning(f"Job {job_id}: Could not extract filename, trying constructed name: {filename}")
 
-        # Check 3: If we found a filename, verify the file exists
+        # Check 3: Verify the file exists
         if filename:
             article_path = settings.articles_dir / filename
             if not article_path.exists():
-                return False, f"Article file not found: {filename}"
+                # Try without leading path components
+                clean_filename = article_path.name
+                article_path = settings.articles_dir / clean_filename
+                if not article_path.exists():
+                    return False, f"Article file not found: {filename}. Agent may have failed to call FileWriterTool."
 
-            # Check 4: Verify file has content
+            # Check 4: Verify file has SUBSTANTIAL content (not empty or stub)
             try:
                 with open(article_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    if len(content) < 500:
-                        return False, f"Article file is too short: {len(content)} characters"
-                    logger.info(f"Job {job_id}: Validated article {filename} ({len(content)} characters)")
+                    
+                    # Empty file detection
+                    if len(content.strip()) == 0:
+                        return False, f"Article file is EMPTY: {filename}. Agent did not save content correctly."
+                    
+                    # Minimum word count check (at least 500 words for basic article)
+                    word_count = len(content.split())
+                    if word_count < 200:
+                        return False, f"Article too short: {word_count} words (minimum 200). File may be corrupted or incomplete."
+                    
+                    logger.info(f"Job {job_id}: Validated article {filename} ({len(content)} chars, ~{word_count} words)")
             except Exception as e:
                 return False, f"Error reading article file: {e}"
+        else:
+            # No filename found and couldn't construct one
+            return False, "Could not determine output filename from agent response"
 
         # Check 5: Look for signs of actual work (scraping, sources, etc.)
         result_lower = result_str.lower()
@@ -120,8 +171,8 @@ class JobService:
             result = crew.kickoff(inputs={'topic': topic})
             result_str = str(result)
 
-            # Validate the result
-            is_valid, error_msg = self._validate_job_completion(job_id, result_str)
+            # Validate the result (pass topic for fallback filename construction)
+            is_valid, error_msg = self._validate_job_completion(job_id, result_str, topic)
 
             if is_valid:
                 self.jobs[job_id]["status"] = JobStatusEnum.COMPLETED

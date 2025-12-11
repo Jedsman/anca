@@ -1,6 +1,6 @@
 # Market Researcher Agent
 
-**Model:** `llama3.2:3b` (fast, focused)  
+**Model:** `llama3.1:8b` (fast, focused)  
 **Temperature:** 0.5 (consistent results)
 
 ## Purpose

@@ -40,9 +40,11 @@ class RAGTool(BaseTool):
     # Internal state
     _client: Optional[chromadb.Client] = None
     _collection: Optional[chromadb.Collection] = None
-    
+    _ingested_urls: set = set()  # Track URLs already ingested this session
+
     def __init__(self, **data):
         super().__init__(**data)
+        self._ingested_urls = set()  # Initialize per instance
         self._initialize_chroma()
     
     def _initialize_chroma(self):
@@ -67,11 +69,27 @@ class RAGTool(BaseTool):
             )
             
             logger.info(f"ChromaDB initialized: {self._collection.count()} documents")
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize ChromaDB: {e}")
             raise
-    
+
+    def clear_collection(self):
+        """Clear all documents from the collection and reset ingested URLs tracker."""
+        try:
+            # Delete and recreate collection
+            self._client.delete_collection(self.collection_name)
+            self._collection = self._client.get_or_create_collection(
+                name=self.collection_name,
+                metadata={"description": "ANCA scraped content storage"}
+            )
+            self._ingested_urls.clear()
+            logger.info("ChromaDB collection cleared")
+            return "✅ Collection cleared successfully"
+        except Exception as e:
+            logger.error(f"Failed to clear collection: {e}")
+            return f"❌ Error clearing collection: {e}"
+
     def _generate_doc_id(self, url: str, chunk_index: int) -> str:
         """Generate unique document ID."""
         content = f"{url}_{chunk_index}"
@@ -105,7 +123,12 @@ class RAGTool(BaseTool):
         try:
             if not url:
                 return "❌ Error: URL is required for ingestion."
-                
+
+            # Skip if already ingested this session
+            if url in self._ingested_urls:
+                logger.info(f"⏭️ Skipping already ingested URL: {url}")
+                return f"⏭️ URL already ingested this session: {url}"
+
             chunks = self._get_cached_chunks(url)
             
             if not chunks:
@@ -137,6 +160,7 @@ class RAGTool(BaseTool):
                     ids=ids
                 )
                 
+                self._ingested_urls.add(url)  # Mark as ingested
                 logger.info(f"Ingested {len(documents)} chunks from {url} into ChromaDB")
                 return f"✅ Successfully ingested {len(documents)} chunks from {url}"
             else:

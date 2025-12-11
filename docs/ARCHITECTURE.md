@@ -45,3 +45,17 @@ anca/
 ├── Dockerfile.api       # Builds the container image
 └── docker-compose.yml   # Maps volumes and ports
 ```
+
+## 🔮 Future Enhancements (Roadmap)
+
+### Content Curator Agent
+**Concept:** An intelligent intermediate agent placed between the **Scraper** and the **Generator**.
+*   **Role:** "The Editor's Assistant"
+*   **Input:** Raw text chunks from the scraper.
+*   **Logic:**
+    1.  Reads each chunk.
+    2.  Checks for relevance using LLM reasoning (e.g., "Is this positive? Is it an opinion piece?").
+    3.  Scores content quality.
+*   **Output:** A curated dataset of "High Value" chunks.
+*   **Why use it?** When simple keyword matching is too crude (e.g., differentiating between a "review" of a product and a "complaint" about shipping).
+*   **Trade-off:** High latency (5-10m) vs. High Precision. Best suited for Cloud/Production environments.

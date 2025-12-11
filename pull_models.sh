@@ -50,8 +50,8 @@ pull_and_verify() {
 }
 
 # Pull each model
-pull_and_verify "llama3.2:3b" "Researcher" || exit 1
-pull_and_verify "qwen2.5:3b" "Generator" || exit 1
+pull_and_verify "llama3.1:8b" "Researcher" || exit 1
+pull_and_verify "llama3.1:8b" "Generator" || exit 1
 pull_and_verify "mistral:7b" "Auditor" || exit 1
 
 echo ""

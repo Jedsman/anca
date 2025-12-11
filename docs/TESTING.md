@@ -60,16 +60,16 @@ docker-compose logs -f anca
 
 Look for:
 - ✓ Ollama connectivity check passes
-- ✓ All three models are available (llama3.2:3b, qwen2.5:3b, mistral:7b)
+- ✓ All three models are available (llama3.1:8b, llama3.1:8b, mistral:7b)
 - ✓ Agent creation logs showing correct models
 
 Example expected output:
 ```
 anca-api | INFO - Checking Ollama connectivity at http://ollama:11434
-anca-api | INFO - ✓ Ollama connected successfully. Available models: ['llama3.2:3b', 'qwen2.5:3b', 'mistral:7b']
+anca-api | INFO - ✓ Ollama connected successfully. Available models: ['llama3.1:8b', 'llama3.1:8b', 'mistral:7b']
 anca-api | INFO - ✓ All required models are available
-anca-api | INFO - Creating Researcher agent with model: ollama/llama3.2:3b at http://ollama:11434
-anca-api | INFO - Creating Generator agent with model: ollama/qwen2.5:3b at http://ollama:11434
+anca-api | INFO - Creating Researcher agent with model: ollama/llama3.1:8b at http://ollama:11434
+anca-api | INFO - Creating Generator agent with model: ollama/llama3.1:8b at http://ollama:11434
 anca-api | INFO - Creating Auditor agent with model: ollama/mistral:7b at http://ollama:11434
 ```
 
@@ -152,7 +152,7 @@ docker exec anca-ollama ollama list
 ### Test Model Directly
 
 ```bash
-docker exec anca-ollama ollama run llama3.2:3b "Hello, test"
+docker exec anca-ollama ollama run llama3.1:8b "Hello, test"
 ```
 
 ### Check Container Networking
@@ -194,8 +194,8 @@ docker-compose restart ollama
 
 1. **Agent Creation Logs:**
    ```
-   Creating Researcher agent with model: ollama/llama3.2:3b at http://ollama:11434
-   Creating Generator agent with model: ollama/qwen2.5:3b at http://ollama:11434
+   Creating Researcher agent with model: ollama/llama3.1:8b at http://ollama:11434
+   Creating Generator agent with model: ollama/llama3.1:8b at http://ollama:11434
    Creating Auditor agent with model: ollama/mistral:7b at http://ollama:11434
    ```
 
@@ -301,8 +301,8 @@ docker-compose restart ollama
 docker-compose up model-puller
 
 # Or pull manually
-docker exec anca-ollama ollama pull llama3.2:3b
-docker exec anca-ollama ollama pull qwen2.5:3b
+docker exec anca-ollama ollama pull llama3.1:8b
+docker exec anca-ollama ollama pull llama3.1:8b
 docker exec anca-ollama ollama pull mistral:7b
 ```
 

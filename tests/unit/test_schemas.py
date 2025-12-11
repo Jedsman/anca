@@ -51,7 +51,8 @@ class TestGenerateRequest:
         """Test rejection of script injection attempts"""
         with pytest.raises(ValidationError) as exc_info:
             GenerateRequest(topic="<script>alert('xss')</script>")
-        assert "suspicious content" in str(exc_info.value).lower()
+        # Pattern validation catches this before custom validator (< > ' not allowed)
+        assert "string should match pattern" in str(exc_info.value).lower()
 
     def test_rejects_javascript_protocol(self):
         """Test rejection of javascript: protocol"""
@@ -69,31 +70,36 @@ class TestGenerateRequest:
         """Test rejection of system command injection"""
         with pytest.raises(ValidationError) as exc_info:
             GenerateRequest(topic="system('rm -rf /')")
-        assert "suspicious content" in str(exc_info.value).lower()
+        # Pattern validation catches this before custom validator (' / not allowed)
+        assert "string should match pattern" in str(exc_info.value).lower()
 
     def test_rejects_python_import(self):
         """Test rejection of Python import injection"""
         with pytest.raises(ValidationError) as exc_info:
             GenerateRequest(topic="__import__('os').system('ls')")
-        assert "suspicious content" in str(exc_info.value).lower()
+        # Pattern validation catches this before custom validator (' not allowed)
+        assert "string should match pattern" in str(exc_info.value).lower()
 
     def test_rejects_exec_injection(self):
         """Test rejection of exec injection"""
         with pytest.raises(ValidationError) as exc_info:
             GenerateRequest(topic="exec('malicious')")
-        assert "suspicious content" in str(exc_info.value).lower()
+        # Pattern validation catches this before custom validator (' not allowed)
+        assert "string should match pattern" in str(exc_info.value).lower()
 
     def test_rejects_only_special_characters(self):
         """Test rejection of topics with only special characters"""
         with pytest.raises(ValidationError) as exc_info:
             GenerateRequest(topic="!@#$%^&*()")
-        assert "alphanumeric character" in str(exc_info.value).lower()
+        # Pattern validation catches this before custom validator (@ # $ % ^ * not allowed)
+        assert "string should match pattern" in str(exc_info.value).lower()
 
     def test_rejects_only_whitespace(self):
         """Test rejection of whitespace-only topics"""
         with pytest.raises(ValidationError) as exc_info:
             GenerateRequest(topic="     ")
-        assert "at least 3 characters" in str(exc_info.value).lower()
+        # Whitespace is stripped first, then alphanumeric check runs on empty string
+        assert "alphanumeric character" in str(exc_info.value).lower()
 
     def test_allows_common_special_chars(self):
         """Test common punctuation is allowed"""

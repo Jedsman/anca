@@ -7,11 +7,23 @@ services:
     container_name: anca-ollama
     ports:
       - "11434:11434"
+    environment:
+      - OLLAMA_NUM_GPU=99
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_NUM_CTX=8192
+      - OLLAMA_MAX_LOADED_MODELS=4
     volumes:
       - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
+      test: [ "CMD-SHELL", "ollama list || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -42,7 +54,7 @@ services:
       - CREWAI_TELEMETRY=false
       - CREWAI_TRACING_ENABLED=false
       - LOG_LEVEL=INFO
-      - LOG_MAX_BYTES=10485760  # 10MB
+      - LOG_MAX_BYTES=10485760 # 10MB
       - LOG_BACKUP_COUNT=5
       - CACHE_TTL_DAYS=7
     volumes:

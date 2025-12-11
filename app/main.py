@@ -96,7 +96,7 @@ async def startup_event():
             logger.info(f"✓ Ollama connected successfully. Available models: {model_names}")
 
             # Verify required models
-            required_models = ['llama3.2:3b', 'qwen2.5:3b', 'mistral:7b']
+            required_models = ['llama3.1:8b', 'mistral:7b']
             missing_models = [m for m in required_models if m not in model_names]
             if missing_models:
                 logger.error(f"✗ Missing required models: {missing_models}")

@@ -21,8 +21,8 @@ open http://localhost:8000/docs
 docker-compose up -d
 
 # Pull required models
-docker exec anca-ollama ollama pull llama3.2:3b
-docker exec anca-ollama ollama pull qwen2.5:3b
+docker exec anca-ollama ollama pull llama3.1:8b
+docker exec anca-ollama ollama pull llama3.1:8b
 docker exec anca-ollama ollama pull mistral:7b
 
 # Check status
