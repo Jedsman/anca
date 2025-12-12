@@ -43,6 +43,7 @@ generation_config = load_prompt("generation_task.yaml")
 research_config = load_prompt("research_task.yaml")
 revision_config = load_prompt("revision_task.yaml")
 critique_config = load_prompt("critique_task.yaml")
+expansion_config = load_prompt("expansion_task.yaml")
 
 class AgentState(TypedDict):
     topic: str
@@ -127,30 +128,72 @@ def researcher_node_wrapper(state: AgentState):
 
 def generator_node_wrapper(state: AgentState):
     logger.info("--- Generator Agent ---")
-    # Get the last message from the researcher
-    last_message = state['messages'][-1].content
-
-    # Use generation task description
-    instruction = generation_config['description'].format(topic=state['topic'])
-    # Append context from researcher
-    instruction += f"\n\nCONTEXT FROM RESEARCHER:\n{last_message}"
-
-    print(f"\n\n=== DEBUG: GENERATOR PROMPT ({len(instruction)} chars) ===\n{instruction}\n==========================================\n")
+    
+    critique_count = state.get('critique_count', 0)
+    
+    if critique_count > 0:
+        # EXPANSION MODE
+        logger.info(f"Refining content (Attempt {critique_count}). Switching to Expansion Prompt.")
+        
+        # Get last message which should be the critique feedback
+        feedback = state['messages'][-1].content
+        filename = state.get('filename', 'unknown.md')
+        target_length = state.get('target_length', 1800)
+        
+        instruction = expansion_config['description'].format(
+            filename=filename,
+            feedback=feedback,
+            target_length=target_length
+        )
+        
+        logger.info(f"Generator using filename: {filename}")
+        
+    else:
+        # INITIAL GENERATION MODE
+        # Get the last message from the researcher
+        last_message = state['messages'][-1].content
+        
+        # [FIX] Enforce filename consistency
+        # If filename is not in state yet, generate it from topic
+        filename = state.get('filename')
+        if not filename:
+            import re
+            slug = state['topic'].lower().replace(' ', '-').replace('_', '-')
+            # Remove non-alphanumeric chars (except dash)
+            slug = re.sub(r'[^a-z0-9-]', '', slug)
+            filename = f"{slug}.md"
+            logger.info(f"Assigned mandated filename: {filename}")
+    
+        # Use generation task description
+        instruction = generation_config['description'].format(
+            topic=state['topic'],
+            filename=filename
+        )
+        # Append context from researcher
+        instruction += f"\n\nCONTEXT FROM RESEARCHER:\n{last_message}"
+    
+    # Debug print
+    # print(f"\n\n=== DEBUG: GENERATOR PROMPT ===\n{instruction[:200]}...\n==============================\n")
 
     # Limit agent's internal tool-calling loop (retrieve ~5x + save = ~15 calls max)
-    result = generator_agent.invoke({"messages": [HumanMessage(content=instruction)]}, config={"recursion_limit": 20})
+    result = generator_agent.invoke({"messages": [HumanMessage(content=instruction)]}, config={"recursion_limit": 25})
 
     # Extract filename from tool calls if save_article was called
-    filename = None
+    # Don't reset filename - preserve the pre-calculated one from above
+    extracted_filename = None
     for msg in result["messages"]:
         if hasattr(msg, 'tool_calls') and msg.tool_calls:
             for tool_call in msg.tool_calls:
                 if tool_call.get('name') == 'save_article':
-                    filename = tool_call.get('args', {}).get('filename')
-                    logger.info(f"Extracted filename from generator: {filename}")
+                    extracted_filename = tool_call.get('args', {}).get('filename')
+                    logger.info(f"Extracted filename from generator: {extracted_filename}")
                     break
 
-    return {"messages": result["messages"], "filename": filename}
+    # Use extracted filename if available, otherwise keep the pre-calculated one
+    final_filename = extracted_filename if extracted_filename else filename
+    logger.info(f"Final filename for state: {final_filename}")
+
+    return {"messages": result["messages"], "filename": final_filename}
 
 def auditor_node_wrapper(state: AgentState):
     logger.info("--- Auditor Agent ---")

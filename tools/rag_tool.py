@@ -77,14 +77,15 @@ class RAGTool(BaseTool):
     def clear_collection(self):
         """Clear all documents from the collection and reset ingested URLs tracker."""
         try:
-            # Delete and recreate collection
-            self._client.delete_collection(self.collection_name)
-            self._collection = self._client.get_or_create_collection(
-                name=self.collection_name,
-                metadata={"description": "ANCA scraped content storage"}
-            )
+            # Safely clear by deleting all documents instead of dropping the collection
+            # This prevents "Collection does not exist" errors due to stale references
+            existing_docs = self._collection.get()
+            if existing_docs and existing_docs['ids']:
+                self._collection.delete(ids=existing_docs['ids'])
+                logger.info(f"Deleted {len(existing_docs['ids'])} documents from collection")
+            
             self._ingested_urls.clear()
-            logger.info("ChromaDB collection cleared")
+            logger.info("ChromaDB collection cleared (documents removed)")
             return "✅ Collection cleared successfully"
         except Exception as e:
             logger.error(f"Failed to clear collection: {e}")
