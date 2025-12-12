@@ -77,7 +77,8 @@ def assembler_node(state: ArticleState):
         logger.info(f"[ASSEMBLER] Article saved to {filepath}")
         
         return {
-            "final_article": final_content
+            "final_article": final_content,
+            "filename": str(filepath)
         }
         
     except Exception as e:

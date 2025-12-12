@@ -17,7 +17,12 @@ graph TD
     end
 
     Writers -->|Sections| Assembler
-    Assembler(Assembler<br/>Final Editor) -->|Final Markdown| Output(Saved Article)
+    Assembler(Assembler<br/>Final Editor) -->|Draft Article| FactChecker
+    FactChecker(Fact Checker) -->|Errors found| Refiner
+    FactChecker -->|No Errors| Auditor
+    Auditor(Auditor<br/>SEO & Quality) -->|Feedback| Refiner
+    Refiner(Refiner<br/>Editor) -->|Refined Article| FactChecker
+    Auditor -->|Pass| Output(Saved Article)
 ```
 
 ## Agents
@@ -41,9 +46,26 @@ graph TD
     - **Output**: A formatted Markdown section.
 
 4.  **Assembler (`agents/assembler.py`)**:
+
     - **Role**: Final Editor.
     - **Task**: Stitches all sections together, adds an introduction and conclusion, and saves the final file.
-    - **Output**: Completed Article.
+
+5.  **Fact Checker (`agents/fact_checker.py`)**:
+
+    - **Role**: Truth Verifier.
+    - **Task**: Checks for hallucinations, incorrect dates, and impossible stats.
+    - **Output**: Pass/Fail + Error Report.
+
+6.  **Auditor (`agents/auditor.py`)**:
+
+    - **Role**: SEO & Quality Control.
+    - **Task**: Critiques the drafted article. If it fails SEO/Quality checks, sends feedback to the Refiner.
+    - **Output**: Pass/Fail + Feedback.
+
+7.  **Refiner (`agents/refiner.py`)**:
+    - **Role**: Fixer.
+    - **Task**: Rewrites the article based on Auditor feedback. Overwrites the file with the improved version.
+    - **Output**: New Draft.
 
 ## Key Features
 
@@ -53,6 +75,9 @@ graph TD
   - **Groq**: `llama-3.3-70b-versatile` (Fast, high quality).
   - **Ollama**: `qwen2.5:7b-instruct` (Local, privacy-focused, zero cost).
 - **Rate Limiting**: Built-in `TokenBucket` rate limiter to prevent 429 errors on free tiers.
+
+- **Fact Check Workflow**: Ensures factual integrity before auditing.
+- **SEO Audit Loop**: Automated "Reflection" step. The `Auditor` critiques the content, and the `Refiner` fixes it. Loops up to 3 times to ensure quality.
 
 ## Usage
 
@@ -74,6 +99,29 @@ uv run python run_graph.py --topic "Benefits of Cold Brew Coffee" --provider oll
 
 ```bash
 uv run python run_graph.py --topic "Advanced Python Patterns" --provider groq --model llama-3.3-70b-versatile
+```
+
+### 4. Automated Topic Discovery (New)
+
+**Scout Mode (Global Trends):**
+Finds a rising trend globally and halts (to show you what it found).
+
+```bash
+uv run python run_graph.py --discover --only-discovery
+```
+
+**Niche Mode (Targeted):**
+Finds a trend within a specific niche.
+
+```bash
+uv run python run_graph.py --niche "Small Business AI" --only-discovery
+```
+
+**Full Auto Run:**
+Remove `--only-discovery` to find a topic AND write the full article immediately.
+
+```bash
+uv run python run_graph.py --discover --provider gemini
 ```
 
 ## Project Structure

@@ -1,72 +1,62 @@
-"""
-SEO Auditor Node (LangGraph)
-Critiques content and provides feedback.
-"""
-import os
 import logging
-from typing import List
-from langchain_ollama import ChatOllama
-from langgraph.prebuilt import create_react_agent
-from langchain_core.tools import tool
-
+from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
+from app.state import ArticleState
+from app.core.llm_wrappers import get_llm
 from app.core.langchain_logging_callback import LangChainLoggingHandler
-from tools.file_reader_tool import FileReaderTool
 
 logger = logging.getLogger(__name__)
 
-# --- Tool Wrappers ---
-file_reader = FileReaderTool()
+class AuditResult(BaseModel):
+    pass_audit: bool = Field(description="True if the article is excellent and needs no changes (score > 85/100). False if revision is needed.")
+    feedback: str = Field(description="Detailed instructions on what to fix. Be specific. If pass_audit is True, simple praise.")
 
-@tool
-def read_article_file(filename: str):
-    """Read the content of the drafted article file to audit it."""
-    return file_reader._run(filename=filename)
+AUDITOR_SYSTEM_PROMPT = """You are a strict SEO Auditor and Editor-in-Chief.
+Review the article provided below.
 
-# --- System Prompt for Tool-First Execution ---
-AUDITOR_SYSTEM_PROMPT = """You are an autonomous SEO auditor agent. You MUST follow these rules STRICTLY:
+Criteria:
+1.  **Keyword Optimization**: Is the main topic clearly the focus in the H1 and intro?
+2.  **Structure**: logic flow, proper H2/H3 usage.
+3.  **Depth**: Does it cover the topic comprehensively?
+4.  **Tone & Style**: Does it sound NATURAL and HUMAN? (Fail if it uses overused AI words like "delve", "realm", "symphony", "testament").
+5.  **Conclusion**: Does it wrap up effectively?
+6.  **Grammar**: Is it grammatically perfect?
 
-## EXECUTION RULES (MANDATORY)
-1. **TOOL-FIRST**: Your FIRST response MUST be a tool call to `read_article_file`. NEVER start with text.
-2. **NO CONVERSATION**: Do NOT ask questions or say "I will now...".
-3. **CRITICAL ANALYSIS**: Be harsh and specific in your critique. No empty praise.
-4. **SCORE REQUIRED**: You MUST provide a "Quality Score: X/10" in your final output.
+If the article is good, pass it.
+If the article is weak, repetitive, or missing key info, fail it and provide specific instructions for the Refiner.
+"""
 
-## FORBIDDEN BEHAVIORS (WILL CAUSE FAILURE)
-- ❌ "Would you like me to..."
-- ❌ "I will now..."
-- ❌ Any question marks in your response
-- ❌ Any text before your first tool call
-- ❌ Ending without a Quality Score
+def auditor_node(state: ArticleState):
+    # User requested Groq for Auditor/Refiner specifically
+    provider = "groq"
+    model = "llama-3.3-70b-versatile"
+    
+    # Force JSON output or use structured output if available
+    llm = get_llm(provider, model, temperature=0.1, callbacks=[LangChainLoggingHandler(agent_name="Auditor")])
+    structured_llm = llm.with_structured_output(AuditResult)
 
-## CORRECT EXECUTION SEQUENCE
-1. Call `read_article_file(filename="...")` to read the article
-2. Analyze against SEO and quality criteria
-3. Output a structured critique with "Quality Score: X/10"
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", AUDITOR_SYSTEM_PROMPT),
+        ("human", "Topic: {topic}\n\nArticle:\n{article}\n\nAudit this article:"),
+    ])
 
-BEGIN EXECUTION NOW. NO TEXT. ONLY TOOL CALLS."""
+    chain = prompt | structured_llm
 
-# --- Node Factory ---
-def create_auditor_node():
-    """Create the Auditor agent as a LangGraph node."""
-
-    # 1. Setup LLM
-    llm = ChatOllama(
-        model="qwen2.5:7b-instruct",
-        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-        temperature=0.3,  # Low temp for critical analysis
-        num_ctx=10240,
-        callbacks=[LangChainLoggingHandler(agent_name="SEO Auditor")]
-    )
-
-    # 2. Define Tools
-    # Auditor NEEDS to read the file to critique it properly
-    tools = [read_article_file]
-
-    # 3. Create Agent with system prompt for tool-first behavior
-    agent = create_react_agent(
-        llm,
-        tools,
-        prompt=AUDITOR_SYSTEM_PROMPT
-    )
-
-    return agent
+    logger.info("[AUDITOR] Auditing article...")
+    try:
+        result = chain.invoke({
+            "topic": state["topic"],
+            "article": state["final_article"]
+        })
+        
+        feedback = result.feedback if not result.pass_audit else None
+        logger.info(f"[AUDITOR] Result: Pass={result.pass_audit}")
+        return {
+            "feedback": feedback,
+            "revision_number": state.get("revision_number", 0) # incremented in refiner or handled in edge? Handled in graph state updates usually.
+        }
+        
+    except Exception as e:
+        logger.error(f"[AUDITOR] Error: {e}")
+        # Default pass to avoid infinite error loops
+        return {"feedback": "Error during audit. Passing by default.", "revision_number": 0}
