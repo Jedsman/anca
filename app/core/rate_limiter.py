@@ -65,5 +65,8 @@ class TokenBucket:
 # Global rate limiter instance for Gemini (15 RPM free tier)
 gemini_rate_limiter = TokenBucket(tokens_per_minute=15)
 
+# Global rate limiter for Gemini 2.0 Flash Lite (Conservative 10 RPM -> 5 RPM due to heavy throttling)
+gemini_flash_lite_limiter = TokenBucket(tokens_per_minute=5)
+
 # Global rate limiter instance for Groq (30 RPM free tier)
 groq_rate_limiter = TokenBucket(tokens_per_minute=30)
