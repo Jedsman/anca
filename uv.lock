@@ -106,6 +106,7 @@ dependencies = [
     { name = "crewai-tools" },
     { name = "ddgs" },
     { name = "duckduckgo-search" },
+    { name = "ebaysdk" },
     { name = "fastapi" },
     { name = "html2text" },
     { name = "langchain" },
@@ -114,6 +115,7 @@ dependencies = [
     { name = "langchain-groq" },
     { name = "langchain-ollama" },
     { name = "langchain-text-splitters" },
+    { name = "langgraph" },
     { name = "litellm" },
     { name = "lxml" },
     { name = "markdown" },
@@ -142,6 +144,7 @@ requires-dist = [
     { name = "crewai-tools" },
     { name = "ddgs", specifier = ">=9.9.3" },
     { name = "duckduckgo-search", specifier = ">=8.1.1" },
+    { name = "ebaysdk", specifier = ">=2.2.0" },
     { name = "fastapi", specifier = ">=0.124.0" },
     { name = "html2text" },
     { name = "langchain", specifier = ">=1.1.2" },
@@ -150,6 +153,7 @@ requires-dist = [
     { name = "langchain-groq", specifier = ">=0.2.0" },
     { name = "langchain-ollama", specifier = ">=1.0.0" },
     { name = "langchain-text-splitters", specifier = ">=1.0.0" },
+    { name = "langgraph", specifier = ">=0.0.10" },
     { name = "litellm", specifier = ">=1.80.8" },
     { name = "lxml", specifier = ">=5.0.0" },
     { name = "markdown", specifier = ">=3.10" },
@@ -851,6 +855,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/9d/a4/e44218c2b394e31a6dd0d6b095c4e1f32d0be54c2a4b250032d717647bab/durationpy-0.10.tar.gz", hash = "sha256:1fa6893409a6e739c9c72334fc65cca1f355dbdd93405d30f726deb5bde42fba", size = 3335, upload-time = "2025-05-17T13:52:37.26Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b0/0d/9feae160378a3553fa9a339b0e9c1a048e147a4127210e286ef18b730f03/durationpy-0.10-py3-none-any.whl", hash = "sha256:3b41e1b601234296b4fb368338fdcd3e13e0b4fb5b67345948f4f2bf9868b286", size = 3922, upload-time = "2025-05-17T13:52:36.463Z" },
+]
+
+[[package]]
+name = "ebaysdk"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "lxml" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/71/6e/ab81d91c90166724439da6b02f289f166cba5ab5e3b0c9f418fe801dfecb/ebaysdk-2.2.0.tar.gz", hash = "sha256:2eb875d706b481f59ca8dd3074538df7e5196814f9ce12d0ef84690343a9c7f3", size = 48459, upload-time = "2020-04-20T22:35:18.021Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/6c/81b7f8cd9561f9b7ccf86f9084a3d5b26aed75e894b207a007312bf87c17/ebaysdk-2.2.0-py3-none-any.whl", hash = "sha256:e43bb4fd36494170bf42bc7fe5686c43103ec9bda235c4e716f3ecb7b0688d7d", size = 72151, upload-time = "2020-04-20T22:35:15.397Z" },
 ]
 
 [[package]]
