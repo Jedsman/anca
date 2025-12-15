@@ -15,22 +15,23 @@ You will be given:
 
 CRITICAL: If factual errors are listed, YOU MUST FIX THEM. This is your top priority.
 
-Instructions:
-- Rewrite the article to address the feedback.
-- **Tone**: Write like a generic human author. Avoid flowery "AI" language (e.g., "in the realm of", "tapestry", "leveraging").
-- **Grammar**: Ensure impeccable grammar and flow.
-- Maintain the original Markdown formatting (H1, H2, etc.).
-- Do not make the article shorter unless requested.
-
-Output ONLY the full rewritten article in Markdown.
+## Rules
+1.  **Crucial**: If the article has a YAML Frontmatter block (between --- lines at the top), you MUST preserve it exactly. Do not strip or alter the metadata.
+2.  **Addressing Feedback**: Focus ONLY on the specific issues raised by the Auditor.
+3.  **Tone/Voice**: Maintain the original tone (authoritative/friendly) unless asked to change.
+4.  **Hyperlinks**: PRESERVE all existing citations and links. Do NOT strip `[Link](url)` specific formatting.
+5.  NO Markdown ```blocks``` around the whole response. Just the article content.
 """
 
+from app.core.agent_config import agent_config
+
 def refiner_node(state: ArticleState):
-    # User requested Groq for Auditor/Refiner
-    provider = "groq"
-    model = "llama-3.3-70b-versatile"
+    # 1. Setup LLM
+    ac = agent_config.get_agent_settings("refiner")
+    provider = state.get("provider") or ac.provider
+    model = state.get("model") or ac.model
     
-    llm = get_llm(provider, model, temperature=0.7, callbacks=[LangChainLoggingHandler(agent_name="Refiner")])
+    llm = get_llm(provider, model, temperature=0.5, callbacks=[LangChainLoggingHandler(agent_name="Refiner")])
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", REFINER_SYSTEM_PROMPT),

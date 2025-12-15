@@ -8,7 +8,7 @@ import logging
 
 from app.core.config import settings
 from app.schemas.models import HealthResponse
-from app.api.routers import generation, articles
+from app.api.routers import generation, articles, publishing, logs, discovery, config
 
 # Configure logging with rotation
 from logging.handlers import RotatingFileHandler
@@ -28,6 +28,8 @@ file_handler = logging.FileHandler(
 )
 file_handler.setFormatter(file_formatter)
 file_handler.setLevel(settings.log_level)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Console Handler (Keep for debugging)
 console_handler = logging.StreamHandler()
@@ -75,6 +77,10 @@ app.add_middleware(
 # Include routers
 app.include_router(generation.router)
 app.include_router(articles.router)
+app.include_router(publishing.router)
+app.include_router(logs.router)
+app.include_router(discovery.router)
+app.include_router(config.router)
 
 
 @app.on_event("startup")

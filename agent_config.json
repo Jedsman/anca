@@ -1,0 +1,44 @@
+{
+  "agents": {
+    "default": {
+      "provider": "gemini",
+      "model": "gemini-1.5-flash-latest"
+    },
+    "planner": {
+      "provider": "gemini",
+      "model": "gemini-1.5-pro-latest"
+    },
+    "researcher": {
+      "provider": "gemini",
+      "model": "gemini-1.5-flash-latest"
+    },
+    "writer": {
+      "provider": "gemini",
+      "model": "gemini-1.5-flash-latest"
+    },
+    "trend_analyzer": {
+      "provider": "gemini",
+      "model": "gemini-1.5-flash-latest"
+    },
+    "editor": {
+      "provider": "gemini",
+      "model": "gemini-1.5-pro-latest"
+    },
+    "auditor": {
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
+    },
+    "refiner": {
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
+    },
+    "fact_checker": {
+      "provider": "groq",
+      "model": "llama-3.3-70b-versatile"
+    },
+    "assembler": {
+      "provider": "gemini",
+      "model": "gemini-1.5-flash-latest"
+    }
+  }
+}

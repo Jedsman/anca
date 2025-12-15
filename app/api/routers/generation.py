@@ -32,7 +32,14 @@ async def generate_content(
     Use the returned job_id to track progress via /status/{job_id}.
     """
     try:
-        job = job_service.create_job(request.topic)
+        job = job_service.create_job(
+            topic=request.topic,
+            affiliate=request.affiliate,
+            niche=request.niche,
+            discover_mode=request.discover_mode,
+            provider=request.provider,
+            model=request.model
+        )
         background_tasks.add_task(job_service.run_job, job.job_id)
         logger.info(f"Created job {job.job_id} for topic: {request.topic}")
         return job

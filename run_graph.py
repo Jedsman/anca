@@ -133,6 +133,7 @@ if __name__ == "__main__":
     parser.add_argument("--discover", action="store_true", help="Enable global trend discovery (Scout Mode)")
     parser.add_argument("--only-discovery", action="store_true", help="Halt after discovering topic")
     parser.add_argument("--interactive", action="store_true", help="Enable interactive topic selection")
+    parser.add_argument("--affiliate", action="store_true", help="Enable Affiliate Marketing Mode (High commercial intent, Buying Guides)")
     args = parser.parse_args()
 
     _setup_logging()
@@ -152,7 +153,8 @@ if __name__ == "__main__":
             "topic": "",
             "interactive": True,
             "provider": args.provider,
-            "model": args.model
+            "model": args.model,
+            "affiliate": args.affiliate
         }
         
         result = trend_analyzer_node(temp_state)
@@ -193,6 +195,7 @@ if __name__ == "__main__":
         "discover_mode": args.discover, 
         "only_discovery": args.only_discovery,
         "interactive": args.interactive,
+        "affiliate": args.affiliate,
         # Blueprint populated by nodes
         "sections_content": [] 
     })

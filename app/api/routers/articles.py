@@ -7,7 +7,7 @@ from datetime import datetime
 import logging
 
 from app.core.config import settings
-from app.schemas.models import ArticleListResponse, ArticleInfo, ErrorResponse
+from app.schemas.models import ArticleListResponse, ArticleInfo, ErrorResponse, UpdateArticleRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["Articles"])
@@ -83,3 +83,29 @@ async def delete_article(filename: str):
     file_path.unlink()
     logger.info(f"Deleted article: {filename}")
     return {"message": f"Article '{filename}' deleted successfully"}
+
+
+@router.put(
+    "/articles/{filename}",
+    summary="Update an article",
+    responses={
+        200: {"description": "Article updated"},
+        404: {"model": ErrorResponse, "description": "Article not found"}
+    }
+)
+async def update_article(filename: str, request: UpdateArticleRequest):
+    """Update a specific article file"""
+    file_path = settings.articles_dir / filename
+    
+    # Check if exists (or create? For now only allow edit existing)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Article '{filename}' not found"
+        )
+    
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(request.content)
+        
+    logger.info(f"Updated article: {filename}")
+    return {"message": f"Article '{filename}' updated successfully"}

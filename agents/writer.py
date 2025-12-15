@@ -1,52 +1,41 @@
-import os
 import logging
-from app.core.llm_wrappers import get_llm
+import json
 from langchain_core.prompts import ChatPromptTemplate
-
-from app.state import Section
+from app.state import ArticleState, Section
+from app.core.llm_wrappers import get_llm
 from app.core.langchain_logging_callback import LangChainLoggingHandler
+from app.core.agent_config import agent_config
 from tools.rag_tool import RAGTool
 
 logger = logging.getLogger(__name__)
 
-# Initialize RAG tool (shared instance or new per node? New is safer for threads)
-# We'll instantiate inside the node or use a global if thread-safe.
-# RAGTool uses ChromaDB PersistentClient which is thread-safe.
+WRITER_SYSTEM_PROMPT = """You are a Senior Technical Writer.
+Your task is to write ONE section of an article based on the provided Heading, Context, and Description.
 
-# --- System Prompt ---
-WRITER_SYSTEM_PROMPT = """You are a specialist writer for a high-end publication. 
-You are responsible for writing ONE specific section of a larger article.
+## Input Context
+You have access to:
+- Heading and Description (from the Editor's plan).
+- Research Context (snippets from search results).
 
-## Your Task
-Write the section: "{heading}"
-
-## Instructions
-*   **Context**: Use the provided research context below.
-*   **Goal**: Write a comprehensive, dense, and engaging section.
-*   **Length**: Aim for ~{word_count} words.
-*   **Style**: Professional, authoritative, yet accessible. match the tone of a premium blog post.
-*   **Formatting**: Use Markdown. You may use subheaders (###) if needed, but do NOT include the main section header (it will be added by the assembler).
-
-## Context from Research
-{context}
-
-## Description of what to cover
-{description}
+## Output Requirements
+- Write ONLY the content for this section. Do NOT include the heading (it will be added by the assembler).
+- Use Markdown formatting (bold, lists, tables).
+- Be conversational but authoritative.
+- Cite sources if they are provided in the context (e.g. [Source]).
+- Follow the Word Count target strictly (don't be too short, don't be too verbose).
 """
 
-def writer_node(state: dict):
+def writer_node(state: dict, section: Section, order: int):
     """
-    Writer Node: Receives a dict {"section": Section, "order": int}, perfroms research, and writes.
+    Writer Node (Parallel execution per section).
+    Note: In LangGraph, we typically map this function over sections.
+    This function should return a partial update to 'sections_content'.
     """
-    section = state["section"]
-    order = state["order"]
-    
-    logger.info(f"[WRITER] Processing section {order}: {section.heading}")
-    
     # 1. Setup LLM
-    # Expect provider/model to be passed in state dict from the Map step
-    provider = state.get("provider", "gemini")
-    model = state.get("model", "gemini-flash-lite-latest")
+    ac = agent_config.get_agent_settings("writer")
+    
+    provider = state.get("provider") or ac.provider
+    model = state.get("model") or ac.model
 
     llm = get_llm(
         provider=provider,
@@ -56,21 +45,27 @@ def writer_node(state: dict):
     )
 
     # 2. Perform Research (Deterministic)
+    # We instantiate RAGTool here. Note: In nested parallel execution, ensure thread safety or new instance.
     rag = RAGTool()
     context_parts = []
     
     # Execute the queries planned by the Editor-in-Chief
     for query in section.search_queries:
         logger.info(f"[WRITER] Searching: {query}")
-        result = rag._run(action="retrieve", query=query)
-        context_parts.append(f"--- Query: {query} ---\n{result}\n")
+        try:
+            result = rag._run(action="retrieve", query=query)
+            context_parts.append(f"--- Query: {query} ---\n{result}\n")
+        except Exception as e:
+            logger.error(f"[WRITER] Search failed for '{query}': {e}")
     
     full_context = "\n".join(context_parts)
-    
+    if not full_context:
+         full_context = "No specific research results found."
+
     # 3. Create Prompt
     prompt = ChatPromptTemplate.from_messages([
         ("system", WRITER_SYSTEM_PROMPT),
-        ("human", "Write the section now."),
+        ("human", "Heading: {heading}\nWord Count Target: {word_count}\nDescription: {description}\n\nResearch Context:\n{context}\n\nWrite the section now:"),
     ])
     
     # 4. Generate
@@ -91,11 +86,11 @@ def writer_node(state: dict):
         
         # Return structured output for the map-reduce accumulator
         # We must return a dict with the key matching the state field we want to update.
+        # In LangGraph map-reduce, this return value is aggregated.
         return {"sections_content": [{"order": order, "content": formatted_section}]}
         
     except Exception as e:
-        logger.error(f"[WRITER] Error writing section {state.heading}: {e}")
-        # Return "error" placeholder or raise?
-        # Better to return a placeholder so the whole article doesn't fail, 
-        # but ideally we retry. For now, fail loud or return empty.
-        return [f"## {state.heading}\n\n(Error writing this section: {e})\n\n"]
+        logger.error(f"[WRITER] Error writing section {section.heading}: {e}")
+        # Return error placeholder so the article can still be assembled
+        error_content = f"## {section.heading}\n\n(Error writing this section: {e})\n\n"
+        return {"sections_content": [{"order": order, "content": error_content}]}

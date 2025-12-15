@@ -17,6 +17,39 @@ class JobStatusEnum(str, Enum):
     FAILED = "failed"
 
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "topic": "home coffee brewing",
+                "affiliate": True,
+                "niche": "Kitchen Appliances",
+                "provider": "gemini"
+            }
+        }
+
+
+class PublishRequest(BaseModel):
+    """Request model for publishing to WordPress"""
+    filename: str = Field(..., description="Filename of the article to publish")
+    wp_url: str = Field(..., description="WordPress Site URL")
+    wp_user: str = Field(..., description="WordPress Username")
+    wp_password: str = Field(..., description="WordPress Application Password")
+    status: str = Field("draft", description="Post status (draft, publish, private)")
+
+
+class DeletePublishedRequest(BaseModel):
+    """Request model for deleting a published article"""
+    id: int = Field(..., description="WordPress Post ID")
+    wp_url: str = Field(..., description="WordPress Site URL")
+    wp_user: str = Field(..., description="WordPress Username")
+    wp_password: str = Field(..., description="WordPress Application Password")
+
+
+class UpdateArticleRequest(BaseModel):
+    """Request model for updating an article"""
+    content: str = Field(..., description="Markdown content")
+
+
 class GenerateRequest(BaseModel):
     """Request model for content generation"""
     topic: str = Field(
@@ -26,6 +59,11 @@ class GenerateRequest(BaseModel):
         description="Topic for content generation (alphanumeric, spaces, hyphens, basic punctuation)",
         pattern=r"^[a-zA-Z0-9\s\-_,.:;!?()&]+$"
     )
+    affiliate: bool = Field(False, description="Enable Affiliate Mode (Buyer's Guides)")
+    niche: Optional[str] = Field(None, description="Specific niche for discovery/planning")
+    discover_mode: bool = Field(False, description="Enable Discovery Mode (find trends first)")
+    provider: Optional[str] = Field(None, description="LLM Provider (gemini, groq, ollama)")
+    model: Optional[str] = Field(None, description="Specific model name")
 
     @field_validator('topic')
     @classmethod
@@ -60,13 +98,6 @@ class GenerateRequest(BaseModel):
         v = re.sub(r'\s+', ' ', v)
 
         return v
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "topic": "home coffee brewing"
-            }
-        }
 
 
 class JobResponse(BaseModel):
@@ -113,6 +144,20 @@ class HealthResponse(BaseModel):
     articles_dir: str = Field(..., description="Articles directory path")
     articles_count: int = Field(..., description="Number of articles")
     timestamp: datetime = Field(default_factory=datetime.now, description="Health check timestamp")
+
+
+class DiscoverRequest(BaseModel):
+    """Request model for topic discovery"""
+    niche: Optional[str] = Field(None, description="Target niche (optional if using generic)")
+    affiliate: bool = Field(False, description="Enable Affiliate Mode")
+    provider: Optional[str] = Field(None, description="LLM Provider")
+    model: Optional[str] = Field(None, description="Specific model name")
+
+
+class DiscoverResponse(BaseModel):
+    """Response model for topic discovery"""
+    topics: List[str] = Field(..., description="List of discovered topics")
+    count: int = Field(..., description="Number of topics found")
 
 
 class ErrorResponse(BaseModel):

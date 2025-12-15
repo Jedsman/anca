@@ -25,6 +25,7 @@ class ArticleState(TypedDict):
     discover_mode: bool
     only_discovery: bool
     interactive: bool # Phase 6
+    affiliate: bool   # Phase 10
     
     # Refiner state
     feedback: Optional[str]

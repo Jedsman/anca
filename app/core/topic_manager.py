@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
-import slugify
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +12,15 @@ class TopicManager:
         self.storage_file = Path(storage_file)
         self.storage_file.parent.mkdir(parents=True, exist_ok=True)
         self.topics = self._load_topics()
+
+    def _slugify(self, text: str) -> str:
+        """Create a slug from text (dependency-free)."""
+        text = text.lower().strip()
+        # Remove non-alphanumeric chars (except spaces and hyphens)
+        text = re.sub(r'[^\w\s-]', '', text)
+        # Replace spaces/underscores with hyphens
+        text = re.sub(r'[-\s]+', '-', text)
+        return text
 
     def _load_topics(self) -> List[Dict]:
         """Load topics from JSON file."""
@@ -36,7 +45,7 @@ class TopicManager:
         """Check if topic exists (fuzzy or exact)."""
         # Simple exact slug match for now
         # Could be enhanced with fuzzy matching or semantic similarity later
-        slug = slugify.slugify(topic)
+        slug = self._slugify(topic)
         for t in self.topics:
             if t.get("slug") == slug:
                 return True
@@ -50,7 +59,7 @@ class TopicManager:
 
         entry = {
             "topic": topic,
-            "slug": slugify.slugify(topic),
+            "slug": self._slugify(topic),
             "created_at": datetime.now().isoformat(),
             "status": "completed",
             "niche": niche

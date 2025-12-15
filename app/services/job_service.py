@@ -15,7 +15,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from app.schemas.models import JobResponse, JobStatusEnum
 from app.core.config import settings
-from run_crew import crew
+from run_graph import app as graph_app
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class JobService:
         slug = re.sub(r'[^a-z0-9]+', '-', topic.lower()).strip('-')
         return f"{slug}.md"
 
-    def _validate_job_completion(self, job_id: str, result_str: str, topic: str = None) -> tuple[bool, Optional[str]]:
+    def _validate_job_completion(self, job_id: str, result_str: str, topic: str = None, filename: str = None) -> tuple[bool, Optional[str]]:
         """
         Validate that a job actually completed successfully.
         Returns (is_valid, error_message)
@@ -77,10 +77,12 @@ class JobService:
         if not result_str or len(result_str.strip()) < 50:
             return False, "Result output is too short or empty"
 
-        # Check 2: Look for article filename in result
-        filename = self._extract_filename_from_result(result_str)
+        # Check 2: Look for article filename
+        if not filename:
+            # Fallback 1: Extract from result
+            filename = self._extract_filename_from_result(result_str)
         
-        # Fallback: construct filename from topic if not found in result
+        # Fallback 2: construct filename from topic if still not found
         if not filename and topic:
             filename = self._construct_filename_from_topic(topic)
             logger.warning(f"Job {job_id}: Could not extract filename, trying constructed name: {filename}")
@@ -125,7 +127,9 @@ class JobService:
 
         return True, None
     
-    def create_job(self, topic: str) -> JobResponse:
+    def create_job(self, topic: str, affiliate: bool = False, niche: str = None, 
+                  discover_mode: bool = False, provider: str = None, 
+                  model: str = None) -> JobResponse:
         """Create a new content generation job"""
         job_id = str(uuid.uuid4())
         
@@ -133,6 +137,11 @@ class JobService:
             "job_id": job_id,
             "status": JobStatusEnum.PENDING,
             "topic": topic,
+            "affiliate": affiliate,
+            "niche": niche,
+            "discover_mode": discover_mode,
+            "provider": provider,
+            "model": model,
             "created_at": datetime.now(),
             "completed_at": None,
             "result": None,
@@ -140,7 +149,7 @@ class JobService:
         }
         
         self.jobs[job_id] = job_data
-        logger.info(f"Created job {job_id} for topic: {topic}")
+        logger.info(f"Created job {job_id} for topic: {topic} (Affiliate: {affiliate})")
         
         return JobResponse(**job_data)
     
@@ -149,7 +158,9 @@ class JobService:
         if job_id not in self.jobs:
             raise ValueError(f"Job {job_id} not found")
         
-        return JobResponse(**self.jobs[job_id])
+        # Handle backward compatibility for old jobs without new fields
+        job_data = self.jobs[job_id].copy()
+        return JobResponse(**job_data)
     
     def list_jobs(self) -> list:
         """List all jobs"""
@@ -162,17 +173,38 @@ class JobService:
             return
 
         try:
-            logger.info(f"Starting job {job_id} for topic: {self.jobs[job_id]['topic']}")
+            job = self.jobs[job_id]
+            logger.info(f"Starting job {job_id} for topic: {job['topic']}")
             self.jobs[job_id]["status"] = JobStatusEnum.RUNNING
 
-            topic = self.jobs[job_id]["topic"]
+            # Prepare Inputs for Crew
+            # Prepare Inputs for LangGraph
+            initial_state = {
+                "topic": job['topic'],
+                "niche": job.get('niche'),
+                "provider": job.get('provider'),
+                "model": job.get('model'),
+                "discover_mode": job.get('discover_mode', False),
+                "affiliate": job.get('affiliate', False),
+                "interactive": False, # Always false via API
+                "only_discovery": False, # API always runs full workflow
+                "sections_content": []
+            }
 
-            # Execute the crew
-            result = crew.kickoff(inputs={'topic': topic})
-            result_str = str(result)
+            # Execute the graph
+            final_state = graph_app.invoke(initial_state)
+            
+            # Extract result
+            result_str = final_state.get("final_article", "")
+            if not result_str and final_state.get("topic"):
+                result_str = f"Workflow completed but no article produced. Final topic: {final_state['topic']}"
 
             # Validate the result (pass topic for fallback filename construction)
-            is_valid, error_msg = self._validate_job_completion(job_id, result_str, topic)
+            # Use 'job['topic']' strictly, unless discovery changed it? 
+            # Ideally we check final_state['topic'] if discovery ran.
+            actual_topic = final_state.get("topic", job['topic'])
+            actual_filename = final_state.get("filename")
+            is_valid, error_msg = self._validate_job_completion(job_id, result_str, actual_topic, actual_filename)
 
             if is_valid:
                 self.jobs[job_id]["status"] = JobStatusEnum.COMPLETED

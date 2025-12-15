@@ -1,56 +1,56 @@
-import os
 import logging
-from app.core.llm_wrappers import get_llm
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import HumanMessage
-
-from app.state import ArticleState, Blueprint
+from app.state import ArticleState, Blueprint, Section
+from app.core.llm_wrappers import get_llm
 from app.core.langchain_logging_callback import LangChainLoggingHandler
+from app.core.agent_config import agent_config
 
 logger = logging.getLogger(__name__)
 
-# --- System Prompt ---
-PLANNER_SYSTEM_PROMPT = """You are the Editor-in-Chief of a high-end publication.
-Your goal is to plan a comprehensive, engaging, and deep article on the given topic.
+PLANNER_SYSTEM_PROMPT = """You are an expert Editor-in-Chief.
+Your goal is to create a comprehensive content blueprint for a high-quality article.
 
-## Instructions
-1. Analyze the user's topic.
-2. Design a logical structure (Blueprint) for the article.
-3. Break it down into 5-7 distinct sections.
-4. For EACH section, provide:
-    *   `heading`: Catchy but clear title.
-    *   `description`: Precise instructions on what this section must cover.
-    *   `word_count`: Target length (usually 300-500 words).
-    *   `search_queries`: 2-3 specific search terms for the researcher to find facts for *this specific section*.
+You will be given a Topic (and potential context).
+You must output a structured Blueprint containing:
+1. Title: Engagement and SEO optimized.
+2. Audience: Who is this for?
+3. Sections: A logical flow of sections.
 
-## Rules
-*   Ensure a logical flow (Introduction -> History/Background -> Core Concepts -> Advanced Details -> Conclusion).
-*   The total word count should aim for 2000+ words.
-*   Be specific in descriptions. Don't just say "Discuss X", say "Explain X by comparing it to Y and citing recent statistics".
+For EACH Section, you must provide:
+- Heading: The section title.
+- Description: Detailed instructions on what to cover.
+- Word Count: Estimate (total article should be ~2000-2500 words).
+- Search Queries: 2-3 specific queries to research this section.
+
+## Guidelines:
+- The article must be deep, authoritative, and engaging.
+- Use a mix of long-form text, lists, and tables (implied in descriptions).
+- If 'Affiliate Mode' is active, structure it as a Buyer's Guide (Intro, Methodology, Top Picks, Comparison, Buying Advice, Conclusion).
 """
 
 def planner_node(state: ArticleState):
-    """
-    Editor-in-Chief node: Generates the article blueprint.
-    """
     logger.info(f"[PLANNER] Planning article for topic: {state['topic']}")
-
+    
     # 1. Setup LLM
+    ac = agent_config.get_agent_settings("planner")
     llm = get_llm(
-        provider=state.get("provider", "gemini"),
-        model=state.get("model", "gemini-flash-lite-latest"),
+        provider=state.get("provider") or ac.provider,
+        model=state.get("model") or ac.model,
         temperature=0.7,
         callbacks=[LangChainLoggingHandler(agent_name="Planner")]
     )
 
     # 2. Configure Structured Output
-    # Gemini supports structured output natively or via LangChain's with_structured_output
     structured_llm = llm.with_structured_output(Blueprint)
 
     # 3. Create Prompt
+    instructions = f"Topic: {state['topic']}"
+    if state.get("affiliate", False):
+        instructions += "\n\nCONTEXT: This is an AFFILIATE REVIEW article. You MUST structure it as a Buyer's Guide with a Comparison Table section and Pros/Cons for products."
+
     prompt = ChatPromptTemplate.from_messages([
         ("system", PLANNER_SYSTEM_PROMPT),
-        ("human", "Topic: {topic}"),
+        ("human", instructions),
     ])
 
     # 4. Invoke

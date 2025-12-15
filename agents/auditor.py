@@ -26,10 +26,14 @@ If the article is good, pass it.
 If the article is weak, repetitive, or missing key info, fail it and provide specific instructions for the Refiner.
 """
 
+from app.core.agent_config import agent_config
+
 def auditor_node(state: ArticleState):
-    # User requested Groq for Auditor/Refiner specifically
-    provider = "groq"
-    model = "llama-3.3-70b-versatile"
+    # 1. Setup LLM
+    ac = agent_config.get_agent_settings("auditor")
+    # Allow override but default to config (which defaults to Groq)
+    provider = state.get("provider") or ac.provider
+    model = state.get("model") or ac.model
     
     # Force JSON output or use structured output if available
     llm = get_llm(provider, model, temperature=0.1, callbacks=[LangChainLoggingHandler(agent_name="Auditor")])

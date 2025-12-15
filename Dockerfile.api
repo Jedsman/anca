@@ -16,7 +16,7 @@ COPY pyproject.toml uv.lock ./
 COPY agents/ ./agents/
 COPY tools/ ./tools/
 COPY app/ ./app/
-COPY run_crew.py ./
+COPY run_graph.py ./
 
 # Install dependencies
 RUN uv sync --frozen

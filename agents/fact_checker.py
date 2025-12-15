@@ -1,15 +1,25 @@
 import logging
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.state import ArticleState
 from app.core.llm_wrappers import get_llm
 from app.core.langchain_logging_callback import LangChainLoggingHandler
 
 logger = logging.getLogger(__name__)
 
+from typing import Union
+
 class FactCheckResult(BaseModel):
-    has_errors: bool = Field(description="True if there are SEVERE factual errors (wrong dates, prices, hallucinated products). False if minor or none.")
+    # Allow bool or string "True"/"False" to be resilient to LLM output
+    has_errors: Union[bool, str] = Field(description="True if there are SEVERE factual errors.")
     error_details: str = Field(description="List of specific errors found and the CORRECTION. If no errors, write 'None'.")
+
+    @field_validator('has_errors', mode='before')
+    @classmethod
+    def parse_bool(cls, v):
+        if isinstance(v, str):
+            return v.lower() == 'true'
+        return v
 
 FACT_CHECKER_SYSTEM_PROMPT = """You are a Digital Fact Checker.
 Your job is to verify the claims in the article.
@@ -26,9 +36,13 @@ Your job is to verify the claims in the article.
 - Do NOT nitpick style or grammar. Focus ONLY on objective facts.
 """
 
+from app.core.agent_config import agent_config
+
 def fact_checker_node(state: ArticleState):
-    provider = "groq"
-    model = "llama-3.3-70b-versatile"
+    # 1. Setup LLM
+    ac = agent_config.get_agent_settings("fact_checker")
+    provider = state.get("provider") or ac.provider
+    model = state.get("model") or ac.model
     
     llm = get_llm(provider, model, temperature=0.0, callbacks=[LangChainLoggingHandler(agent_name="FactChecker")])
     structured_llm = llm.with_structured_output(FactCheckResult)

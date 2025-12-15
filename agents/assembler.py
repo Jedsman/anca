@@ -7,6 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.state import ArticleState
 from app.core.config import settings
 from app.core.langchain_logging_callback import LangChainLoggingHandler
+from app.core.agent_config import agent_config
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +21,20 @@ Your job is to take the drafted sections of an article and assemble them into a 
     *   Preserve the technical depth and facts from the drafts.
     *   Fix any repetition or disjointed flow.
 4.  **Conclusion**: Write a strong Conclusion that summarizes and gives a call to action or final thought.
-5.  **Formatting**: Output the Full Markdown Article.
-    *   Start with a Level 1 Title (# Title).
-    *   Use proper headers (##, ###).
+5. - **Format**: Return the final article in Markdown.
+  *   Start with a Level 1 Title (# Title).
+  *   Use proper headers (##, ###).
+- **Metadata**: You MUST generate a YAML Frontmatter block at the very top of the file.
+  - `title`: The title of the article.
+  - `image_prompt`: A creative, photorealistic, 4k, cinematic lighting prompt for an AI image generator that captures the essence of the article. NOT the title, but a visual description.
+
+Example Output:
+---
+title: The Future of AI
+image_prompt: A futuristic city with glowing blue neural networks in the sky, photorealistic, 8k, cinematic
+---
+# The Future of AI
+...
 
 ## Input Context
 Topic: {topic}
@@ -43,9 +55,11 @@ def assembler_node(state: ArticleState):
     draft_body = "\n\n".join([s["content"] for s in sorted_sections])
     
     # 3. Setup LLM
+    ac = agent_config.get_agent_settings("assembler")
+    
     llm = get_llm(
-        provider=state.get("provider", "gemini"),
-        model=state.get("model", "gemini-flash-lite-latest"),
+        provider=state.get("provider") or ac.provider,
+        model=state.get("model") or ac.model,
         temperature=0.7,
         callbacks=[LangChainLoggingHandler(agent_name="Assembler")]
     )
