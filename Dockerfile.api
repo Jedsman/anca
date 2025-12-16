@@ -17,6 +17,9 @@ COPY agents/ ./agents/
 COPY tools/ ./tools/
 COPY app/ ./app/
 COPY run_graph.py ./
+COPY run_sniper.py ./
+COPY sniper.md ./
+COPY strategies.md ./
 
 # Install dependencies
 RUN uv sync --frozen

@@ -55,6 +55,12 @@ services:
       - LOG_MAX_BYTES=10485760 # 10MB
       - LOG_BACKUP_COUNT=5
       - CACHE_TTL_DAYS=7
+      - EBAY_APP_ID=${EBAY_APP_ID}
+      - EBAY_CERT_ID=${EBAY_CERT_ID}
+      - EBAY_CERT_ID=${EBAY_CERT_ID}
+      - EBAY_DEV_ID=${EBAY_DEV_ID}
+      - MOCK_EBAY=${MOCK_EBAY:-true}
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     env_file:
       - .env
     volumes:
@@ -67,6 +73,9 @@ services:
       - ./agents:/app/agents
       - ./tools:/app/tools
       - ./run_graph.py:/app/run_graph.py
+      - ./run_sniper.py:/app/run_sniper.py
+      - ./sniper.md:/app/sniper.md
+      - ./strategies.md:/app/strategies.md
       - ./agent_config.json:/app/agent_config.json
     depends_on:
       ollama:

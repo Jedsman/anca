@@ -8,7 +8,12 @@ import logging
 
 from app.core.config import settings
 from app.schemas.models import HealthResponse
-from app.api.routers import generation, articles, publishing, logs, discovery, config
+from app.api.routers import logs, config, sniper
+
+# ...
+
+# Include routers
+
 
 # Configure logging with rotation
 from logging.handlers import RotatingFileHandler
@@ -75,11 +80,8 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(generation.router)
-app.include_router(articles.router)
-app.include_router(publishing.router)
+app.include_router(sniper.router)
 app.include_router(logs.router)
-app.include_router(discovery.router)
 app.include_router(config.router)
 
 

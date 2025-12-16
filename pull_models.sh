@@ -52,7 +52,10 @@ pull_and_verify() {
 # Pull each model
 pull_and_verify "llama3.1:8b" "Researcher" || exit 1
 pull_and_verify "qwen2.5:7b-instruct" "Generator" || exit 1
-pull_and_verify "mistral:7b" "Auditor" || exit 1
+pull_and_verify "mistral" "Auditor" || exit 1
+pull_and_verify "gemma2:9b-instruct-q8_0" "Triage" || exit 1
+pull_and_verify "mixtral:8x7b-instruct-v0.1-q5_K_M" "Planner" || exit 1
+pull_and_verify "llama3.1:8b-instruct-q8_0" "Reflection" || exit 1
 
 echo ""
 echo "All models pulled and verified successfully!"

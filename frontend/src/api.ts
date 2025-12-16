@@ -67,18 +67,23 @@ export interface AgentsConfig {
     agents: Record<string, AgentSettings>;
 }
 
+export interface RunSniperRequest {
+    query?: string;
+    min_profit: number;
+    auto: boolean;
+    discover: boolean;
+    mock: boolean;
+}
+
 export const api = {
-    generate: (data: GenerateRequest) => axios.post<Job>(`${API_BASE}/generate`, data),
-    getJob: (jobId: string) => axios.get<Job>(`${API_BASE}/status/${jobId}`),
-    listJobs: () => axios.get<Job[]>(`${API_BASE}/jobs`),
-    listArticles: () => axios.get<{ articles: Article[] }>(`${API_BASE}/articles`),
-    deleteArticle: (filename: string) => axios.delete(`${API_BASE}/articles/${filename}`),
-    publishArticle: (data: PublishRequest) => axios.post(`${API_BASE}/publish`, data),
-    deletePublished: (data: DeletePublishedRequest) => axios.post(`${API_BASE}/publish/delete`, data),
-    updateArticle: (filename: string, content: string) => axios.put(`${API_BASE}/articles/${filename}`, { content }),
-    getArticle: (filename: string) => axios.get(`${API_BASE}/articles/${filename}`, { responseType: 'text' }),
+    // Sniper Endpoints
+    runSniper: (data: RunSniperRequest) => axios.post<{ status: string, message: string }>(`${API_BASE}/sniper/run`, data),
+    getSniperStatus: () => axios.get<any>(`${API_BASE}/sniper/status`),
+    getSniperResults: () => axios.get<any>(`${API_BASE}/sniper/results`),
+    getRateLimitStatus: () => axios.get<any>(`${API_BASE}/sniper/rate-limit`),
+    
+    // Legacy / Shared
     getLogs: (lines: number = 100) => axios.get<{ logs: string[] }>(`${API_BASE}/logs?lines=${lines}`),
-    discoverTopics: (data: DiscoverRequest) => axios.post<{ topics: string[], count: number }>(`${API_BASE}/discover_topics`, data),
     getAgentConfig: () => axios.get<AgentsConfig>(`${API_BASE}/config/agents`),
     updateAgentConfig: (config: AgentsConfig) => axios.post<AgentsConfig>(`${API_BASE}/config/agents`, config)
 };
