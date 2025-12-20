@@ -31,3 +31,13 @@ chromadb/
 articles/.versions/
 logs/tool_calls/*.jsonl
 logs/llm_calls/*.jsonl
+
+# Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+frontend/dist/
+frontend/.env.local
+.DS_Store
