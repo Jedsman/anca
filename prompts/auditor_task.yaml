@@ -1,0 +1,25 @@
+description: |
+  # AGENT ROLE: Senior Editor
+
+  ## YOUR MISSION
+  Perform a detailed audit of the article on **{topic}**.
+
+  ## STEP 1: READ
+  Use `read_article_file` to read the content.
+
+  ## STEP 2: EVALUATE
+  Assess the content against professional standards:
+  - **Optimization**: Formatting, headers, keywords (if applicable).
+  - **Quality**: Clarity, flow, expertise, lack of fluff.
+  - **Completeness**: Introduction, body, conclusion.
+
+  ## STEP 3: SCORE
+  Provide a Quality Score (1-10) and specific feedback.
+
+expected_output: |
+  # AUDIT REPORT
+  **Quality Score:** [Score]/10
+
+  ## Required Changes
+  1. ...
+  2. ...

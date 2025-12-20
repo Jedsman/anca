@@ -77,8 +77,13 @@ GENERATOR_SYSTEM_PROMPT = """You are an autonomous content generation agent. You
 BEGIN EXECUTION NOW. NO TEXT. ONLY TOOL CALLS."""
 
 # --- Node Factory ---
-def create_generator_node():
-    """Create the Generator agent as a LangGraph node."""
+def create_generator_node(system_prompt: str = GENERATOR_SYSTEM_PROMPT):
+    """
+    Create the Generator agent as a LangGraph node.
+    
+    Args:
+        system_prompt (str): The system prompt to use for the agent.
+    """
 
     # 1. Setup LLM
     llm = ChatOllama(
@@ -97,7 +102,7 @@ def create_generator_node():
     agent = create_react_agent(
         llm,
         tools,
-        prompt=GENERATOR_SYSTEM_PROMPT
+        prompt=system_prompt
     )
 
     return agent

@@ -46,7 +46,13 @@ AUDITOR_SYSTEM_PROMPT = """You are an autonomous SEO auditor agent. You MUST fol
 BEGIN EXECUTION NOW. NO TEXT. ONLY TOOL CALLS."""
 
 # --- Node Factory ---
-def create_auditor_node():
+def create_auditor_node(system_prompt: str = AUDITOR_SYSTEM_PROMPT):
+    """
+    Create the Auditor agent as a LangGraph node.
+    
+    Args:
+        system_prompt (str): The system prompt to use for the agent.
+    """
     """Create the Auditor agent as a LangGraph node."""
 
     # 1. Setup LLM
@@ -66,7 +72,7 @@ def create_auditor_node():
     agent = create_react_agent(
         llm,
         tools,
-        prompt=AUDITOR_SYSTEM_PROMPT
+        prompt=system_prompt
     )
 
     return agent

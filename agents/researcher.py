@@ -56,8 +56,13 @@ Your response should IMMEDIATELY start with a tool call. Example:
 BEGIN EXECUTION NOW. NO TEXT. ONLY TOOL CALLS."""
 
 # --- Node Factory ---
-def create_researcher_node():
-    """Create the Researcher agent as a LangGraph node."""
+def create_researcher_node(system_prompt: str = RESEARCHER_SYSTEM_PROMPT):
+    """
+    Create the Researcher agent as a LangGraph node.
+    
+    Args:
+        system_prompt (str): The system prompt to use for the agent.
+    """
 
     # 1. Setup LLM
     llm = ChatOllama(
@@ -75,7 +80,7 @@ def create_researcher_node():
     agent = create_react_agent(
         llm,
         tools,
-        prompt=RESEARCHER_SYSTEM_PROMPT
+        prompt=system_prompt
     )
 
     return agent

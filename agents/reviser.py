@@ -70,8 +70,13 @@ BEGIN EXECUTION NOW. NO TEXT. ONLY TOOL CALLS."""
 
 
 # --- Node Factory ---
-def create_seo_reviser_node():
-    """Create the SEO Reviser agent as a LangGraph node."""
+def create_reviser_node(system_prompt: str = SEO_REVISER_SYSTEM_PROMPT):
+    """
+    Create the Reviser agent as a LangGraph node.
+    
+    Args:
+        system_prompt (str): The system prompt to use for the agent.
+    """
 
     # 1. Setup LLM
     llm = ChatOllama(
@@ -89,14 +94,10 @@ def create_seo_reviser_node():
     agent = create_react_agent(
         llm,
         tools,
-        prompt=SEO_REVISER_SYSTEM_PROMPT
+        prompt=system_prompt
     )
 
     return agent
 
 
-# Keep old function name for backwards compatibility during transition
-def create_reviser_node():
-    """Deprecated: Use create_seo_reviser_node instead."""
-    logger.warning("create_reviser_node is deprecated, use create_seo_reviser_node")
-    return create_seo_reviser_node()
+
